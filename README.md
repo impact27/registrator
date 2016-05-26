@@ -1,10 +1,10 @@
 ## Synopsis
 
-At the top of the file there should be a short introduction and/ or overview that explains **what** the project is. This description should match descriptions added for package managers (Gemspec, package.json, etc.)
+This python3 code does image registration for microfluidics devices. The scale, rotation and position between two images is extracted 
 
 ## Code Example
 
-Show what the library does as concisely as possible, developers should be able to figure out **how** your project solves their problem by looking at the code example. Make sure the API you are showing off is obvious, and that your code is short and concise.
+Show what the code does as concisely as possible, developers should be able to figure out **how** your project solves their problem by looking at the code example. Make sure the API you are showing off is obvious, and that your code is short and concise.
 
 ## Motivation
 
@@ -28,4 +28,6 @@ Let people know how they can dive into the project, include important links to t
 
 ## License
 
-A short snippet describing the license (MIT, Apache, etc.)
+A short snippet describing the license (GPLv3, MIT, Apache, etc.)
+
+If you don't know what to choose check: http://www.gnu.org/licenses/license-recommendations.en.html

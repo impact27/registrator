@@ -8,7 +8,7 @@ from numpy.fft import rfft2, fftshift,irfft
 from scipy.ndimage.interpolation import map_coordinates
 import math
 import numpy
-import registration as reg
+from . import image as reg
 import cv2
 
 def channel_width(im,chanangle=None,isrfftedge=False):
