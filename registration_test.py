@@ -40,10 +40,6 @@ def plotreg(im0,im2,origin):
     plt.imshow(cr.edge(im2),extent=ir.get_extent(origin, im2.shape),alpha=0.5)
     plt.show()
 
-
-
-
-
 #%% Test Channel direction and width
 #Choose image
 im0=imgs[1]
