@@ -4,24 +4,16 @@ This python3 code does image registration for microfluidics devices. The scale, 
 
 ## Code Example
 load the module
-~~~~
->>>import registration.channel as cr
-~~~~
+: import registration.channel as cr
 
 Get a channel direction
-~~~~
->>>an0=cr.channel_angle(im0)
-~~~~
+: an0=cr.channel_angle(im0)
 
 Get a channel width
-~~~~
->>>width0=cr.channel_width(im0,chanangle=an0)
-~~~~
+: width0=cr.channel_width(im0,chanangle=an0)
 
 Compare two images
-~~~~
->>>angle, scale, origin, im2=cr.register_channel(im0,im1)
-~~~~
+: angle, scale, origin, im2=cr.register_channel(im0,im1)
 
 ## Motivation
 
@@ -33,19 +25,16 @@ This project will automatically detect these differences.
 This project require python3, openCV 3 and the python openCV interface
 
 On a mac with HomeBrew:
-~~~~
-brew install python3
-brew install opencv3 --with-python3
-ln -s /usr/local/opt/opencv3/lib/python3.5/site-packages/cv2.cpython-35m-darwin.so /usr/local/lib/python3.5/site-packages/cv2.so
-~~~~
 
+: brew install python3
+: brew install opencv3 --with-python3
+: ln -s /usr/local/opt/opencv3/lib/python3.5/site-packages/cv2.cpython-35m-darwin.so /usr/local/lib/python3.5/site-packages/cv2.so
 
 ## API Reference
 
 The python help function gives the required infos as docstrings have been specified.
-~~~~
->>>help(cr)
-~~~~
+: help(cr)
+
 
 ## Tests
 
