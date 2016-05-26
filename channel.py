@@ -90,8 +90,9 @@ def register_channel(im0,im1,scale=None,ch0angle=None):
     """
     #extract the channels edges
     e0=edge(im0)
+    e1=edge(im1)
     fe0=abs(fftshift(rfft2(e0),axes=(0,)))
-    fe1=abs(fftshift(rfft2(edge(im1)),axes=(0,)))
+    fe1=abs(fftshift(rfft2(e1),axes=(0,)))
     
     #get angle from biggest angular feature
     a0=channel_angle(fe0,isrfftedge=True)
@@ -109,6 +110,7 @@ def register_channel(im0,im1,scale=None,ch0angle=None):
     #scale and rotate
     im2=reg.rotate_scale(im1,angle,scale)
     #get edge from scaled and rotated im1
+    #TODO: Remove the edges in e2 (use cv2.BORDER_REPLICATE?)
     e2=edge(im2)
     #find offset
     y,x=reg.cross_correlation_shift(e0,e2)

@@ -40,7 +40,7 @@ def rotate_scale(im,angle,scale):
     """Rotates and scales the image"""
     rows,cols = im.shape
     M = cv2.getRotationMatrix2D((cols/2,rows/2),-angle*180/numpy.pi,1/scale)
-    im = cv2.warpAffine(im,M,(cols,rows),borderMode=cv2.BORDER_REPLICATE)
+    im = cv2.warpAffine(im,M,(cols,rows),borderMode=cv2.BORDER_CONSTANT)#REPLICATE
     return im
     
 def cross_correlation_shift(im0,im1,ylim=None,xlim=None):
