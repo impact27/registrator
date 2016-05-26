@@ -3,31 +3,58 @@
 This python3 code does image registration for microfluidics devices. The scale, rotation and position between two images is extracted 
 
 ## Code Example
+load the module
+~~~~
+>>>import registration.channel as cr
+~~~~
 
-Show what the code does as concisely as possible, developers should be able to figure out **how** your project solves their problem by looking at the code example. Make sure the API you are showing off is obvious, and that your code is short and concise.
+Get a channel direction
+~~~~
+>>>an0=cr.channel_angle(im0)
+~~~~
+
+Get a channel width
+~~~~
+>>>width0=cr.channel_width(im0,chanangle=an0)
+~~~~
+
+Compare two images
+~~~~
+>>>angle, scale, origin, im2=cr.register_channel(im0,im1)
+~~~~
 
 ## Motivation
 
-A short description of the motivation behind the creation and maintenance of the project. This should explain **why** the project exists.
+Between series of images, the device mignt have moved, of the focal distance might have changed. 
+This project will automatically detect these differences.
 
 ## Installation
 
-Provide code examples and explanations of how to get the project.
+This project require python3, openCV 3 and the python openCV interface
+
+On a mac with HomeBrew:
+~~~~
+brew install python3
+brew install opencv3 --with-python3
+ln -s /usr/local/opt/opencv3/lib/python3.5/site-packages/cv2.cpython-35m-darwin.so /usr/local/lib/python3.5/site-packages/cv2.so
+~~~~
+
 
 ## API Reference
 
-Depending on the size of the project, if it is small and simple enough the reference docs can be added to the README. For medium size to larger projects it is important to at least provide a link to where the API reference docs live.
+The python help function gives the required infos as docstrings have been specified.
+~~~~
+>>>help(cr)
+~~~~
 
 ## Tests
 
-Describe and show how to run the tests with code examples.
+The file registration_test runs a series of tests
 
 ## Contributors
 
-Let people know how they can dive into the project, include important links to things like issue trackers, irc, twitter accounts if applicable.
+If you want to improve this code feel free to talk to me or send push requests
 
 ## License
 
-A short snippet describing the license (GPLv3, MIT, Apache, etc.)
-
-If you don't know what to choose check: http://www.gnu.org/licenses/license-recommendations.en.html
+This code is under GPLv3
