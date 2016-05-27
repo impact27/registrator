@@ -40,7 +40,7 @@ def rotate_scale(im,angle,scale):
     """Rotates and scales the image"""
     rows,cols = im.shape
     M = cv2.getRotationMatrix2D((cols/2,rows/2),-angle*180/numpy.pi,1/scale)
-    im = cv2.warpAffine(im,M,(cols,rows),borderMode=cv2.BORDER_CONSTANT)#REPLICATE
+    im = cv2.warpAffine(im,M,(cols,rows),borderMode=cv2.BORDER_CONSTANT,flags=cv2.INTER_CUBIC)#REPLICATE
     return im
     
 def cross_correlation_shift(im0,im1,ylim=None,xlim=None):
@@ -50,7 +50,9 @@ def cross_correlation_shift(im0,im1,ylim=None,xlim=None):
     
     ylim and xlim limit the possible output.
     """
-    
+    #Remove mean
+    im0=im0-im0.mean()
+    im1=im1-im1.mean()
     #Save shapes as numpy array
     shape0=numpy.array(im0.shape)
     shape1=numpy.array(im1.shape)
@@ -90,6 +92,13 @@ def cross_correlation_shift(im0,im1,ylim=None,xlim=None):
     xc=cv2.matchTemplate(numpy.float32(im0),numpy.float32(im1),cv2.TM_CCORR)
     #Find maximum of abs (can be anticorrelated)
     idx=numpy.array(numpy.unravel_index(numpy.argmax(abs(xc)),xc.shape))    
+    import matplotlib.pyplot as plt
+    plt.figure()
+    plt.plot(xc[-offset[0],:]/xc.max())
+    plt.plot([-offset[1],-offset[1]],[0,1])
+    plt.figure()
+    plt.plot(xc[:,-offset[1]]/xc.max())
+    plt.plot([-offset[0],-offset[0]],[0,1])
     #Return origin in im0 units
     return idx+offset
     
@@ -115,6 +124,7 @@ def find_rotation_scale(im0,im1,alim=None,slim=None,isrfft=False):
                                            anglestep=anglestep,
                                            islogr=True,
                                            isrfft=isrfft)
+    print(anglestep)
     #get size of pi/2
     spi2=lp0.shape[0]//2
     #prepare the limits
@@ -130,6 +140,9 @@ def find_rotation_scale(im0,im1,alim=None,slim=None,isrfft=False):
     #The padding is modified to have a circular solution
     im=numpy.concatenate((lp0[spi2:,:],lp0,lp0[:spi2,:]))
     angle,scale= cross_correlation_shift(im,lp1,ylim=alim,xlim=slim)
+    a=numpy.pi/2/anglestep
+    import matplotlib.pyplot as plt
+    plt.plot([a,a],[0,1])
     #get angle in correct units
     angle*=anglestep
     #remove the padding

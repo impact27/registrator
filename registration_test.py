@@ -102,9 +102,30 @@ plotreg(im0,im2,origin)
 #This doesn't work... -> add filtering?
 photo=mpimg.imread('IMG.jpg')
 photo=photo.sum(-1)
-part=zoom(rotate(photo,0),0.9)
-photo2=photo[:int(.9*photo.shape[0])+1,:int(.9*photo.shape[1])]
-angle, scale, origin, im2=ir.register_images(numpy.float32(photo2),numpy.float32(part))
 #%%
+sc=.9
+part=ir.rotate_scale(numpy.float32(photo),numpy.pi/3,1)
+#%%
+importlib.reload(ir)
+angle, scale, origin, im2=ir.register_images(numpy.float32(photo),numpy.float32(part))
+#%%
+close(6)
 plt.figure(6)
-plotreg(photo2,part, origin)
+plotreg(photo,im2, origin)
+
+#%%
+from matplotlib.pyplot import figure, plot, imshow, show,close,semilogy
+im0=photo
+im1=part
+lp0, anglestep, log_base=ir.polar_fft(im0, islogr=True)
+lp1, anglestep, log_base=ir.polar_fft(im1, islogr=True, anglestep=anglestep, log_base=log_base)
+close(0)
+close(1)
+figure(0)
+semilogy(lp0.mean(0))
+semilogy(lp1.mean(0))
+figure(1)
+semilogy(lp0.mean(1))
+semilogy(lp1.mean(1))
+#%%
+print(math.log(1/sc,log_base))
