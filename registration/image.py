@@ -40,10 +40,13 @@ def rotate_scale(im,angle,scale):
     """Rotates and scales the image"""
     rows,cols = im.shape
     M = cv2.getRotationMatrix2D((cols/2,rows/2),-angle*180/numpy.pi,1/scale)
-    im = cv2.warpAffine(im,M,(cols,rows),borderMode=cv2.BORDER_CONSTANT,flags=cv2.INTER_CUBIC)#REPLICATE
+    im = cv2.warpAffine(im,M,(cols,rows),
+                        borderMode=cv2.BORDER_CONSTANT,
+                        flags=cv2.INTER_CUBIC)#REPLICATE
     return im
     
-def cross_correlation_shift(im0,im1,ylim=None,xlim=None):
+def cross_correlation_shift(im0,im1,ylim=None,xlim=None,
+                            xpadmode='constant', ypadmode='constant'):
     """Finds the best translation fit between im0 and im1 (top corner)
     
     The origin of im1 in the im0 referential is returned
@@ -87,18 +90,30 @@ def cross_correlation_shift(im0,im1,ylim=None,xlim=None):
     xpad=(pad[2],pad[3])
     #prepare matrix
     im0=cv2prep(im0)
-    im0=numpy.lib.pad(im0,(ypad,xpad),'constant')
+    im0=numpy.lib.pad(im0,((0,0),xpad),mode=xpadmode)
+    im0=numpy.lib.pad(im0,(ypad,(0,0)),mode=ypadmode)
     #compute Cross correlation matrix
     xc=cv2.matchTemplate(numpy.float32(im0),numpy.float32(im1),cv2.TM_CCORR)
     #Find maximum of abs (can be anticorrelated)
-    idx=numpy.array(numpy.unravel_index(numpy.argmax(abs(xc)),xc.shape))    
+    idx=numpy.array(numpy.unravel_index(numpy.argmax(xc),xc.shape))    
+    
+    
+    
+    
     import matplotlib.pyplot as plt
     plt.figure()
-    plt.plot(xc[-offset[0],:]/xc.max())
-    plt.plot([-offset[1],-offset[1]],[0,1])
+    plt.imshow(xc)
     plt.figure()
-    plt.plot(xc[:,-offset[1]]/xc.max())
-    plt.plot([-offset[0],-offset[0]],[0,1])
+    plt.plot(xc[idx[0],:]/xc.max())
+    plt.plot([idx[1],idx[1]],[0,1])
+    plt.figure()
+    plt.plot(xc[:,idx[1]]/xc.max())
+    plt.plot([idx[0],idx[0]],[0,1])
+    
+    
+    
+    
+    
     #Return origin in im0 units
     return idx+offset
     
@@ -124,29 +139,33 @@ def find_rotation_scale(im0,im1,alim=None,slim=None,isrfft=False):
                                            anglestep=anglestep,
                                            islogr=True,
                                            isrfft=isrfft)
-    print(anglestep)
-    #get size of pi/2
-    spi2=lp0.shape[0]//2
     #prepare the limits
     if alim is not None:
         #transform the limit in pixel size
-        alim= numpy.int64((numpy.array(alim))/anglestep)+spi2
+        alim= numpy.int64((numpy.array(alim))/anglestep)
     else:
-        #between -pi/2 and pi/2 (or (-spi2,spi2)+spi2)
-        alim= numpy.array([0,lp0.shape[0]])
+        alim= numpy.int64([-numpy.pi/2,numpy.pi/2]/anglestep)
     if slim is not None:
         slim=numpy.int64(numpy.log(slim)/numpy.log(log_base))
-    #compute the cross correlattion to extract the angle and scale 
-    #The padding is modified to have a circular solution
-    im=numpy.concatenate((lp0[spi2:,:],lp0,lp0[:spi2,:]))
-    angle,scale= cross_correlation_shift(im,lp1,ylim=alim,xlim=slim)
+    #compute the cross correlattion to extract the angle and scale     
+    angle,scale= cross_correlation_shift(lp0,lp1,ylim=alim,xlim=slim,
+                                         ypadmode='wrap',xpadmode='edge')
+    
+    
+    
+    
     a=numpy.pi/2/anglestep
     import matplotlib.pyplot as plt
     plt.plot([a,a],[0,1])
+    plt.plot([a+angle,a+angle],[0,1])
+    print(anglestep)
+    
+    
+    
+    
+    
     #get angle in correct units
     angle*=anglestep
-    #remove the padding
-    angle-=numpy.pi/2
     #get scale in linear units
     scale=log_base ** (scale)
     #return angle and scale
