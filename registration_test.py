@@ -32,6 +32,7 @@ fns.append('20160513/10_3.tif')
 fns.append('channel_opening.png')
 imgs=[mpimg.imread(fn) for fn in fns]
 
+#%%
 #defines an useful plot
 def plotreg(im0,im2,origin):
     imshow(im0)
@@ -97,36 +98,7 @@ angle, scale, origin, im2=cr.register_channel(im0,im1)
 figure(5)
 plotreg(im0,im2,origin)
 
-#%% test with actual image
-#This doesn't work... -> add filtering?
-photo=mpimg.imread('IMG.jpg')
-photo=photo.sum(-1)
-#%%
-importlib.reload(ir)
-part=ir.rotate_scale(numpy.float32(photo),numpy.pi/3,1)
-#%%
-importlib.reload(ir)
-angle, scale, origin, im2=ir.register_images(numpy.float32(photo),numpy.float32(part))
-#%
-close(6)
-figure(6)
-plotreg(photo,im2, origin)
 
-#%%
 
-im0=photo
-im1=part[1000:2500,:2000]
-lp0, anglestep, log_base=ir.polar_fft(im0, islogr=True)
-lp1, anglestep, log_base=ir.polar_fft(im1, islogr=True, anglestep=anglestep, log_base=log_base)
-close(0)
-close(1)
-figure(0)
-semilogy(lp0.mean(0))
-semilogy(lp1.mean(0))
-figure(1)
-semilogy(lp0.mean(1))
-semilogy(lp1.mean(1))
-a=lp1.mean(1)
-semilogy(numpy.r_[a[1283:],a[:1283]])
 
 

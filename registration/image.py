@@ -16,7 +16,7 @@ B. Srinivasa Reddy and B. N. Chatterji
 
 """
 #import libraries
-from numpy.fft import rfft2, fftshift
+from numpy.fft import irfft2,rfft2, fftshift
 import numpy
 import math
 import cv2    
@@ -26,7 +26,7 @@ import cv2
 def register_images(im0,im1):
     """Finds the rotation, scaling and translation of im1 relative to im0
     
-    TODO: test this function for general kind of images
+    TODO: use openCV dft to get more speed?
     """
     #Get rotation and scale
     angle, scale = find_rotation_scale(im0,im1)
@@ -95,31 +95,30 @@ def cross_correlation_shift(im0,im1,ylim=None,xlim=None,
     #compute Cross correlation matrix
     xc=cv2.matchTemplate(numpy.float32(im0),numpy.float32(im1),cv2.TM_CCORR)
     #Find maximum of abs (can be anticorrelated)
-    idx=numpy.array(numpy.unravel_index(numpy.argmax(xc),xc.shape))    
-    
-    
-    
-    
-    import matplotlib.pyplot as plt
-    plt.figure()
-    plt.imshow(xc)
-    plt.figure()
-    plt.plot(xc[idx[0],:]/xc.max())
-    plt.plot([idx[1],idx[1]],[0,1])
-    plt.figure()
-    plt.plot(xc[:,idx[1]]/xc.max())
-    plt.plot([idx[0],idx[0]],[0,1])
-    
-    
-    
-    
-    
+    idx=numpy.array(numpy.unravel_index(numpy.argmax(xc),xc.shape))        
     #Return origin in im0 units
     return idx+offset
     
 def clamp(a):
     """return a between -pi/2 and pi/2 (in fourrier plane, +pi is the same)"""
     return (a+numpy.pi/2)%numpy.pi - numpy.pi/2
+    
+def shift_fft(im0,im1):
+    """The "official" shift method"""
+    #Need same shape
+    assert im0.shape == im1.shape
+    shape=numpy.array(im0.shape)
+    #compute fft
+    f0=rfft2(im0)
+    f1=rfft2(im1)
+    #compute matrix
+    xc=irfft2((f0*f1.conj())/(abs(f0)*abs(f1)))
+    #find max
+    idx=numpy.array(numpy.unravel_index(numpy.argmax(xc),xc.shape)) 
+    #restrics to reasonable values
+    idx[idx>shape//2]-=shape[idx>shape//2]
+    return idx
+    
     
 def find_rotation_scale(im0,im1,alim=None,slim=None,isrfft=False):
     """Compares the images and return the best guess for the rotation angle,
@@ -129,41 +128,26 @@ def find_rotation_scale(im0,im1,alim=None,slim=None,isrfft=False):
     
     The angle and scale search can be limited by alim and slim respectively
     -pi/2< alim < pi/2
-    
-    TODO: check this works for images of different sizes
     """
     #Get log polar coordinates. choose the log base 
     lp1, anglestep, log_base=polar_fft(im1, islogr=True,isrfft=isrfft)
     lp0, anglestep, log_base=polar_fft(im0,
-                                           log_base=log_base, 
+                                           radiimax=lp1.shape[1], 
                                            anglestep=anglestep,
                                            islogr=True,
                                            isrfft=isrfft)
-    #prepare the limits
-    if alim is not None:
-        #transform the limit in pixel size
-        alim= numpy.int64((numpy.array(alim))/anglestep)
-    else:
-        alim= numpy.int64([-numpy.pi/2,numpy.pi/2]/anglestep)
+    if alim is None:
+        alim=[-numpy.pi/2,numpy.pi/2]
+    #transform the limit in pixel size
+    alim= numpy.int64((numpy.array(alim))/anglestep)
     if slim is not None:
         slim=numpy.int64(numpy.log(slim)/numpy.log(log_base))
+        
+    angle, scale = shift_fft(numpy.log(lp0),numpy.log(lp1))  
+    
     #compute the cross correlattion to extract the angle and scale     
-    angle,scale= cross_correlation_shift(lp0,lp1,ylim=alim,xlim=slim,
-                                         ypadmode='wrap',xpadmode='edge')
-    
-    
-    
-    
-    a=numpy.pi/2/anglestep
-    import matplotlib.pyplot as plt
-    plt.plot([a,a],[0,1])
-    plt.plot([a+angle,a+angle],[0,1])
-    print(anglestep)
-    
-    
-    
-    
-    
+    #angle,scale= cross_correlation_shift(numpy.log(lp0),numpy.log(lp1),ylim=alim,xlim=slim,
+    #                                     ypadmode='wrap')    
     #get angle in correct units
     angle*=anglestep
     #get scale in linear units
@@ -177,7 +161,7 @@ def get_extent(origin, shape):
     return [origin[1],origin[1]+shape[1],origin[0]+shape[0],origin[0]]
     
 def polar_fft(image, isrfft=False, anglestep=None, radiimax=None,
-              islogr=False, log_base=None):
+              islogr=False):
     """Return fft in polar (or log-polar) units
     
     if the image is already fft2 and fftshift, set isrfft to True
@@ -186,14 +170,11 @@ def polar_fft(image, isrfft=False, anglestep=None, radiimax=None,
     If it is not specified, a value is deduced from the image size
     
     radiimax is the maximal radius (log of radius if islogr is true).
-    if not provided, it is deduced from the image size (or log_base)
+    if not provided, it is deduced from the image size
     
     To get log-polar, set islogr to True
-    log_base is the base of the log. If not provided, it is deduced 
-    from radiimax.
-    
-    radiimax is the maximal value of the log. If not provided, 
-    it is deduced from log_base or the size of the image.
+    log_base is the base of the log. It is deduced from radiimax.
+    Two images that will be compared should therefore have the same radiimax.
     """
     #get recentered fft if not already done
     if not isrfft:
@@ -209,19 +190,15 @@ def polar_fft(image, isrfft=False, anglestep=None, radiimax=None,
     if anglestep is None:
         anglestep=1/qshape.min()
     
+    #get the theta range
     thetalin=numpy.arange(-numpy.pi/2,numpy.pi/2,anglestep,dtype=numpy.float32)
     nbangles=thetalin.size
     
-    #For the radii, the units are comparable if the log_base is the same. 
+    #For the radii, the units are comparable if the log_base and radiimax are
+    #the same. Therefore, log_base is deduced from radiimax
     #The step is assumed to be 1
     if radiimax is None:
-        if islogr and log_base is not None:
-            #s**n/min=1
-            radiimax=int(math.log(qshape.min(),log_base))
-        else:
-            radiimax = qshape.min()
-    
-    #The log base needs to solve log_radii_max=log_{log_base}(linear_radii_max)
+        radiimax = qshape.min()
         
     #fill theta matrix
     theta = numpy.empty((nbangles, radiimax), dtype=numpy.float32)
@@ -229,28 +206,26 @@ def polar_fft(image, isrfft=False, anglestep=None, radiimax=None,
     
     #fill radius matrix
     radius = numpy.empty_like(theta)
-    #If log, steps are s**i/min() which is from 1px/min() to 1
+    
+    #also as the circle is an ellipse in the image, 
+    #we want the radius to be from 0 to 1
     if islogr:
-        if log_base is None:
-            #s**n/min()=1
-            log_base = math.exp(math.log(qshape.min()) / radiimax)
+        #The log base solves log_radii_max=log_{log_base}(linear_radii_max)
+        #where we decided arbitrarely that linear_radii_max=log_radii_max
+        log_base=math.exp(math.log(radiimax) / radiimax)
         radius[:] = ((log_base ** numpy.arange(0,radiimax,dtype=numpy.float32))
-                    /qshape.min())
+                    /radiimax)
     else:
         radius[:] = numpy.linspace(0,1,radiimax, endpoint=False,
                                     dtype=numpy.float32)
-        
     
-    
-    #We need a correction factor to have the same units in x and y (1/shape[i])
-    #This is needed otherwise units of the radiuus are inconsistant
-    
-    #get x y coordinates matrix (with "frequency" units of y axis)
+    #get x y coordinates matrix (The units are 0 to 1, therefore a circle is
+    #represented as an ellipse)
     y = qshape[0]*radius * numpy.sin(theta) + center[0]
     x = qshape[1]*radius * numpy.cos(theta) + center[1]
     
     #get output
-    output=cv2.remap(cv2prep(image),x,y,cv2.INTER_LINEAR)#LINEAR, CUBIC,INTER_LANCZOS4
+    output=cv2.remap(cv2prep(image),x,y,cv2.INTER_LINEAR)#LINEAR, CUBIC,LANCZOS4
     #output=map_coordinates(image, [y, x]) 
     if islogr:
         return output, anglestep, log_base
