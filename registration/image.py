@@ -33,7 +33,8 @@ def register_images(im0,im1):
     #apply rotation and scale
     im2=rotate_scale(im1,angle,scale)
     #Find offset
-    y,x=cross_correlation_shift(im0,im2)
+    #y,x=cross_correlation_shift(im0,im2)
+    y,x=shift_fft(im0,im2)
     return angle, scale, [y, x], im2
     
 def rotate_scale(im,angle,scale):
@@ -139,7 +140,6 @@ def find_rotation_scale(im0,im1,isrfft=False):
     angle, scale = shift_fft(numpy.log(lp0),numpy.log(lp1))     
     #get angle in correct units
     angle*=anglestep
-    print(log_base, scale)
     #get scale in linear units
     scale=log_base ** (scale)
     #return angle and scale
