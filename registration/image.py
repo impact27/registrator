@@ -112,7 +112,7 @@ def shift_fft(im0,im1):
     f0=rfft2(im0)
     f1=rfft2(im1)
     #compute matrix
-    xc=irfft2((f0*f1.conj())/(abs(f0)*abs(f1)))
+    xc=irfft2((f0*f1.conj())/(abs(f0)*abs(f1)),s=shape)
     #find max
     idx=numpy.array(numpy.unravel_index(numpy.argmax(xc),xc.shape)) 
     #restrics to reasonable values
@@ -120,7 +120,7 @@ def shift_fft(im0,im1):
     return idx
     
     
-def find_rotation_scale(im0,im1,alim=None,slim=None,isrfft=False):
+def find_rotation_scale(im0,im1,isrfft=False):
     """Compares the images and return the best guess for the rotation angle,
     and scale difference
     
@@ -136,24 +136,31 @@ def find_rotation_scale(im0,im1,alim=None,slim=None,isrfft=False):
                                            anglestep=anglestep,
                                            islogr=True,
                                            isrfft=isrfft)
+    angle, scale = shift_fft(numpy.log(lp0),numpy.log(lp1))     
+    #get angle in correct units
+    angle*=anglestep
+    print(log_base, scale)
+    #get scale in linear units
+    scale=log_base ** (scale)
+    #return angle and scale
+    return angle, scale
+    
+    
+    #old method
+    """
+    ,alim=None,slim=None):
     if alim is None:
         alim=[-numpy.pi/2,numpy.pi/2]
     #transform the limit in pixel size
     alim= numpy.int64((numpy.array(alim))/anglestep)
     if slim is not None:
         slim=numpy.int64(numpy.log(slim)/numpy.log(log_base))
-        
-    angle, scale = shift_fft(numpy.log(lp0),numpy.log(lp1))  
-    
     #compute the cross correlattion to extract the angle and scale     
-    #angle,scale= cross_correlation_shift(numpy.log(lp0),numpy.log(lp1),ylim=alim,xlim=slim,
-    #                                     ypadmode='wrap')    
-    #get angle in correct units
-    angle*=anglestep
-    #get scale in linear units
-    scale=log_base ** (scale)
-    #return angle and scale
-    return angle, scale
+    angle,scale= cross_correlation_shift(numpy.log(lp0),numpy.log(lp1),
+                                         ylim=alim,xlim=slim,
+                                         ypadmode='wrap')
+    
+    """
     
 
 def get_extent(origin, shape):
