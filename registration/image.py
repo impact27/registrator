@@ -46,8 +46,39 @@ def rotate_scale(im,angle,scale):
                         flags=cv2.INTER_CUBIC)#REPLICATE
     return im
     
-def cross_correlation_shift(im0,im1,ylim=None,xlim=None,
-                            xpadmode='constant', ypadmode='constant'):
+def pad_img(im,pad):
+    """Pad positively with 0 or negatively (cut)
+    
+    Pad is (ytop, ybottom, xleft, xright)
+    or (imin, imax, jmin, jmax)
+    """
+    #get shape
+    shape=im.shape
+    #extract offset from padding 
+    offset=-pad[::2]
+    #if the padding is negatif, cut the matrix
+    cut=pad<0
+    if cut.any():
+        #Extract value for pad
+        cut*=pad
+        #the left/top components should be positive
+        cut[::2]*=-1
+        #The right/bottom components can't be 0, replace by shape0
+        cut[1::2]+=(cut[1::2]==0)*shape
+        #cut the image
+        im=im[cut[0]:cut[1],cut[2]:cut[3]]
+    #extract positive padding
+    ppad=pad>0
+    if ppad.any():
+        pad=pad*ppad
+        #separate pad for application on matrix
+        ypad=(pad[0],pad[1])
+        xpad=(pad[2],pad[3])
+        #prepare matrix
+        im=numpy.lib.pad(im,(ypad,xpad),mode='mean')
+    return im, offset
+    
+def cross_correlation_shift(im0,im1,ylim=None,xlim=None):
     """Finds the best translation fit between im0 and im1 (top corner)
     
     The origin of im1 in the im0 referential is returned
@@ -65,34 +96,16 @@ def cross_correlation_shift(im0,im1,ylim=None,xlim=None,
     offset=1-shape1
     pad=numpy.lib.pad(-offset,(1,1),mode='edge')
     
-    if ylim is not None or xlim is not None:
-        #apply limit on padding
-        if ylim is not None:
-            pad[0]=-ylim[0]
-            pad[1]=ylim[1]+(shape1-shape0)[0]
-        if xlim is not None:
-            pad[2]=-xlim[0]
-            pad[3]=xlim[1]+(shape1-shape0)[1]
-        #extract new offset from padding 
-        offset=-pad[::2]
-        #if the padding is negatif, cut the matrix
-        cut=pad*(pad<0)
-        #the left/top components should be positive
-        cut[::2]*=-1
-        #The right/bottom components can't be 0, replace by shape0
-        cut[1::2]+=(cut[1::2]==0)*shape0
-        #cut the matrix
-        im0=im0[cut[0]:cut[1],cut[2]:cut[3]]
-        #extract positive padding
-        pad=pad*(pad>0)
-        
-    #separate pad for application on matrix
-    ypad=(pad[0],pad[1])
-    xpad=(pad[2],pad[3])
-    #prepare matrix
+    #apply limit on padding
+    if ylim is not None:
+        pad[0]=-ylim[0]
+        pad[1]=ylim[1]+(shape1-shape0)[0]
+    if xlim is not None:
+        pad[2]=-xlim[0]
+        pad[3]=xlim[1]+(shape1-shape0)[1]
+    
+    im0, offset = pad_img(im0,pad)
     im0=cv2prep(im0)
-    im0=numpy.lib.pad(im0,((0,0),xpad),mode=xpadmode)
-    im0=numpy.lib.pad(im0,(ypad,(0,0)),mode=ypadmode)
     #compute Cross correlation matrix
     xc=cv2.matchTemplate(numpy.float32(im0),numpy.float32(im1),cv2.TM_CCORR)
     #Find maximum of abs (can be anticorrelated)
@@ -106,8 +119,14 @@ def clamp(a):
     
 def shift_fft(im0,im1):
     """The "official" shift method"""
-    #Need same shape
-    assert im0.shape == im1.shape
+    #TODO: Need same shape
+    if im0.shape is not im1.shape:
+        shapediff=numpy.array(im0.shape)-numpy.array(im1.shape)
+        pad0=-shapediff*(shapediff<0)
+        pad1=shapediff*(shapediff>0)
+        im0=numpy.lib.pad(im0,((0,pad0[0]),(0,pad0[1])),mode='mean')
+        im1=numpy.lib.pad(im1,((0,pad1[0]),(0,pad1[1])),mode='mean')
+        
     shape=numpy.array(im0.shape)
     #compute fft
     f0=rfft2(im0)
