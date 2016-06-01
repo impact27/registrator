@@ -16,7 +16,8 @@ B. Srinivasa Reddy and B. N. Chatterji
 
 """
 #import libraries
-from numpy.fft import irfft2,rfft2, fftshift
+#from numpy.fft import irfft2,rfft2, fftshift
+from numpy.fft import fftshift
 import numpy
 import math
 import cv2    
@@ -25,18 +26,33 @@ import cv2
     
 def register_images(im0,im1):
     """Finds the rotation, scaling and translation of im1 relative to im0
-    
-    TODO: use openCV dft to get more speed?
     """
+    #resize for DFT
+    im0, f0=dft_resize(im0)
+    im1, f1=dft_resize(im1)
     #Get rotation and scale
-    angle, scale = find_rotation_scale(im0,im1)
+    angle, scale = find_rotation_scale(f0,f1, isccs=True)
     #apply rotation and scale
     im2=rotate_scale(im1,angle,scale)
+    __,f2=dft_resize(im2)
     #Find offset
     #y,x=cross_correlation_shift(im0,im2)
-    y,x=shift_fft(im0,im2)
+    y,x=shift_fft(f0,f2, isccs=True)
     return angle, scale, [y, x], im2
     
+def dft_resize(im):
+    """Resize image for optimal DFT"""
+    #save shape
+    shape=im.shape
+    #get optimal size
+    ys=cv2.getOptimalDFTSize(shape[0]) 
+    xs=cv2.getOptimalDFTSize(shape[1])
+    #Add zeros to go to optimal size
+    im = cv2.copyMakeBorder(im, 0, ys - shape[0], 0, xs - shape[1], 
+                            borderType=cv2.BORDER_CONSTANT, value=0);
+    #Compute dft ignoring 0 rows (0 columns can not be optimized)
+    f = cv2.dft(im,nonzeroRows=shape[0])
+    return im,f
 def rotate_scale(im,angle,scale):
     """Rotates and scales the image"""
     rows,cols = im.shape
@@ -116,31 +132,51 @@ def cross_correlation_shift(im0,im1,ylim=None,xlim=None):
 def clamp(a):
     """return a between -pi/2 and pi/2 (in fourrier plane, +pi is the same)"""
     return (a+numpy.pi/2)%numpy.pi - numpy.pi/2
-    
-def shift_fft(im0,im1):
+def fill_norm_ccs(ccs):
+    ys=ccs.shape[0]
+    xs=ccs.shape[1]
+    #start with first column
+    ccs[2::2,0]=ccs[1:ys-1:2,0]
+    #continue with middle columns
+    ccs[:,2::2]=ccs[:,1:xs-1:2]
+    #finish whith last row if even
+    if xs%2 is 0:
+        ccs[2::2,xs-1]=ccs[1:ys-1:2,xs-1]
+        
+    return ccs
+        
+        
+def shift_fft(im0,im1, isccs=False):
     """The "official" shift method"""
-    #TODO: Need same shape
+    #TODO: different shapes
+    if not isccs:
+        __,im0=dft_resize(im0)
+        __,im1=dft_resize(im1)
+    
+    mulSpec=cv2.mulSpectrums(im0,im1,flags=0,conjB=True)
+    normccs=numpy.sqrt(cv2.mulSpectrums(im0,im0,flags=0,conjB=True)*
+                       cv2.mulSpectrums(im1,im1,flags=0,conjB=True))
+    normccs=fill_norm_ccs(normccs)
+    
+    xc=cv2.dft(mulSpec/normccs, flags=cv2.DFT_REAL_OUTPUT|cv2.DFT_INVERSE)
+    
+    """
     if im0.shape is not im1.shape:
         shapediff=numpy.array(im0.shape)-numpy.array(im1.shape)
         pad0=-shapediff*(shapediff<0)
         pad1=shapediff*(shapediff>0)
-        im0=numpy.lib.pad(im0,((0,pad0[0]),(0,pad0[1])),mode='mean')
-        im1=numpy.lib.pad(im1,((0,pad1[0]),(0,pad1[1])),mode='mean')
-        
-    shape=numpy.array(im0.shape)
-    #compute fft
-    f0=rfft2(im0)
-    f1=rfft2(im1)
-    #compute matrix
-    xc=irfft2((f0*f1.conj())/(abs(f0)*abs(f1)),s=shape)
+        im0=numpy.lib.pad(im0,((0,pad0[0]),(0,pad0[1])),mode='constant')
+        im1=numpy.lib.pad(im1,((0,pad1[0]),(0,pad1[1])),mode='constant')
+        """
+    shape=numpy.array(xc.shape)
     #find max
-    idx=numpy.array(numpy.unravel_index(numpy.argmax(xc),xc.shape)) 
+    idx=numpy.array(numpy.unravel_index(numpy.argmax(xc),shape)) 
     #restrics to reasonable values
     idx[idx>shape//2]-=shape[idx>shape//2]
     return idx
     
     
-def find_rotation_scale(im0,im1,isrfft=False):
+def find_rotation_scale(im0,im1,isccs=False):
     """Compares the images and return the best guess for the rotation angle,
     and scale difference
     
@@ -150,12 +186,12 @@ def find_rotation_scale(im0,im1,isrfft=False):
     -pi/2< alim < pi/2
     """
     #Get log polar coordinates. choose the log base 
-    lp1, anglestep, log_base=polar_fft(im1, islogr=True,isrfft=isrfft)
+    lp1, anglestep, log_base=polar_fft(im1, islogr=True,isccs=isccs)
     lp0, anglestep, log_base=polar_fft(im0,
                                            radiimax=lp1.shape[1], 
                                            anglestep=anglestep,
                                            islogr=True,
-                                           isrfft=isrfft)
+                                           isccs=isccs)
     angle, scale = shift_fft(numpy.log(lp0),numpy.log(lp1))     
     #get angle in correct units
     angle*=anglestep
@@ -186,11 +222,36 @@ def get_extent(origin, shape):
     """Computes the extent for imshow() (see matplotlib doc)"""
     return [origin[1],origin[1]+shape[1],origin[0]+shape[0],origin[0]]
     
-def polar_fft(image, isrfft=False, anglestep=None, radiimax=None,
+def centered_mag_sq_CCS(image):
+    """return centered squared magnitude
+    
+    Check doc Intel* Image Processing Library
+    https://www.comp.nus.edu.sg/~cs4243/doc/ipl.pdf"""
+    #multiply image by image* to get squared magnitude
+    image=cv2.mulSpectrums(image,image,flags=0,conjB=True)    
+    
+    ys=image.shape[0]
+    xs=image.shape[1]
+    #get correct size return
+    ret=numpy.zeros((ys,xs//2+1))
+    #fill easy center column
+    ret[:,1:]=image[:,1::2]
+    #center
+    ret[0,0]=image[0,0]
+    #first part first column
+    ret[1:ys//2+1,0]=image[1::2,0]
+    #copy first part first column
+    ret[:ys//2:-1,0]=ret[1:(ys-1)//2+1,0]
+    #correct last line if even
+    if xs%2 is 0:
+        ret[1:ys//2+1,xs//2]=image[1::2,xs-1]   
+        ret[ys//2+1:,xs//2]=0
+    return fftshift(ret,(0,))
+def polar_fft(image, isccs=False, anglestep=None, radiimax=None,
               islogr=False):
     """Return fft in polar (or log-polar) units
     
-    if the image is already fft2 and fftshift, set isrfft to True
+    if the image is already fft2 and fftshift, set isccs to True
     
     anglestep set the precision on the angle.
     If it is not specified, a value is deduced from the image size
@@ -202,9 +263,12 @@ def polar_fft(image, isrfft=False, anglestep=None, radiimax=None,
     log_base is the base of the log. It is deduced from radiimax.
     Two images that will be compared should therefore have the same radiimax.
     """
-    #get recentered fft if not already done
-    if not isrfft:
-        image=abs(fftshift(rfft2(image),axes=(0,)))
+    #get dft if not already done
+    if not isccs:
+        __,image=dft_resize(image)
+        
+    #recenter dft
+    image=centered_mag_sq_CCS(image)
     
     #the center is shifted from 0,0 to the ~ center 
     #(eg. if 4x4 image, the center is at [2,2], as if 5x5)
@@ -251,7 +315,7 @@ def polar_fft(image, isrfft=False, anglestep=None, radiimax=None,
     x = qshape[1]*radius * numpy.cos(theta) + center[1]
     
     #get output
-    output=cv2.remap(cv2prep(image),x,y,cv2.INTER_LINEAR)#LINEAR, CUBIC,LANCZOS4
+    output=cv2.remap(image,x,y,cv2.INTER_LINEAR)#LINEAR, CUBIC,LANCZOS4
     #output=map_coordinates(image, [y, x]) 
     if islogr:
         return output, anglestep, log_base
