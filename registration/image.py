@@ -23,7 +23,7 @@ The scale difference should be reasonable (2x)
 If you crop the images to reasonable size, the algorithm is much faster:
 eg:
 512x512   : 0.06s
-1024x1024 : 0.35s
+1024x1024 : 0.42s
 4096x4096 : 9s
 
 """
@@ -32,6 +32,7 @@ import numpy as np
 import math
 import cv2
 from scipy.optimize import curve_fit
+from scipy.ndimage.measurements import label
 
 def register_images(im0,im1):
     """Finds the rotation, scaling and translation of im1 relative to im0
@@ -164,12 +165,18 @@ def gauss_fit(X,Y):
     return curve_fit(gaus,X,Y,p0=[height,mean,sigma])
     
 def gauss_fit_log(X,Y):
+    print(Y.shape)
     Data=np.log(Y)
     D=[(Data*X**i).sum() for i in range(3)]
     X=[(X**i).sum() for i in range(5)]
-    res = (D[0]*X[1]*X[4] - D[0]*X[2]*X[3] - D[1]*X[0]*X[4] + D[1]*X[2]**2 +
-        D[2]*X[0]*X[3] - D[2]*X[1]*X[2])/(2*(D[0]*X[1]*X[3] - D[0]*X[2]**2 -
+    num=(D[0]*X[1]*X[4] - D[0]*X[2]*X[3] - D[1]*X[0]*X[4] + D[1]*X[2]**2 +
+        D[2]*X[0]*X[3] - D[2]*X[1]*X[2])
+    den=(2*(D[0]*X[1]*X[3] - D[0]*X[2]**2 -
         D[1]*X[0]*X[3] + D[1]*X[1]*X[2] + D[2]*X[0]*X[2] - D[2]*X[1]**2))
+    res = 0
+    if den > 0.00001:
+        print(num,den)
+        res=num/den
     
     return res
      
@@ -204,24 +211,55 @@ def shift_fft(im0,im1, isccs=False, subpix=True):
         #get values along X and Y
         Y0=np.take(xc[:,idx[1]],np.r_[idx[0]+X[0]:idx[0]+X[-1]+1],mode='wrap')
         Y1=np.take(xc[idx[0],:],np.r_[idx[1]+X[0]:idx[1]+X[-1]+1],mode='wrap')
-        #Fit a gaussian to the fit
+        #Extract peak
         cut=3*xc.std()
         #update idx
         idx=np.float64(idx)
-        idx[0]+=gauss_fit_log(X[Y0>cut],Y0[Y0>cut])
-        idx[1]+=gauss_fit_log(X[Y1>cut],Y1[Y1>cut])
         
+        #0   
+        def getVal(X,Y,cut):
+            #isolate peak
+            peak=Y>cut
+            peak=label(peak)
+            peak=peak==peak[5]
+            
+            X=X[peak]
+            Y=Y[peak]
+            
+            #default is 0
+            ret=0
+            #if>2, use fit_log
+            if peak.sum() > 2:
+                ret=gauss_fit_log(X,Y)
+            #if>1, use COM
+            elif peak.sum() >1:
+                ret=(X*Y).sum()/Y.sum()
+        
+        idx[0]+=getVal(X,Y0,cut)
+        idx[1]+=getVal(X,Y1,cut)
+        
+        
+        
+        i=getVal(X,Y0,cut)
+        j=getVal(X,Y1,cut)
+        """
+        idx[0]+=i
+        idx[1]+=j
+        
+        popt0,__=gauss_fit(X,Y0)
+        popt1,__=gauss_fit(X,Y1)
         """
         import matplotlib.pyplot as plt
-        plt.figure(0+a)
+        plt.figure()
         plt.plot(X,Y0,'x',label='data')
-        plt.plot([popt0[1],popt0[1]],[1,Y0.max()],label='fit')
+        #plt.plot([popt0[1],popt0[1]],[1,Y0.max()],label='fit')
         plt.plot([i,i],[1,Y0.max()],label='logfit')
-        plt.figure(1+a)
+        plt.plot([-5,5],[cut,cut])
+        plt.figure()
         plt.plot(X,Y1,'x',label='data')
-        plt.plot([popt1[1],popt1[1]],[1,Y1.max()],label='fit')
+        #plt.plot([popt1[1],popt1[1]],[1,Y1.max()],label='fit')
         plt.plot([j,j],[1,Y1.max()],label='logfit')
-        """
+        plt.plot([-5,5],[cut,cut])
         
     #restrics to reasonable values
     idx[idx>shape//2]-=shape[idx>shape//2]
@@ -244,17 +282,6 @@ def find_rotation_scale(im0,im1,isccs=False):
                                            islogr=True,
                                            isccs=isccs)
     angle, scale = shift_fft(cv2.log(lp0),cv2.log(lp1))
-
-    """
-    import matplotlib.pyplot as plt
-    da=-np.pi/3/anglestep-angle
-    ds=math.log(1/1.6,log_base)-scale
-    plt.figure(0)#angle np.pi/3
-    plt.plot([da,da],[1,12000],label='exact')
-    plt.figure(1)#scale 1.6
-    plt.plot([ds,ds],[1,12000],label='exact')
-    """
-
      
     #get angle in correct units
     angle*=anglestep
