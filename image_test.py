@@ -30,11 +30,12 @@ part=ir.rotate_scale(numpy.float32(photo),numpy.pi/3,1.2)
 importlib.reload(ir)
 angle, scale, origin, im2=ir.register_images(numpy.float32(photo),
                                              numpy.float32(part))
+"""
 figure()
 plotreg(photo,im2, origin)
 
 #%%
-"""
+
 importlib.reload(ir)
 im0=photo
 im1=part
@@ -53,4 +54,4 @@ plot(lp0.mean(1))
 plot(lp1.mean(1))
 
 ir.shift_fft(lp0,lp1)
-"""
+#"""

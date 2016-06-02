@@ -13,16 +13,26 @@ An FFT-Based Technique for Translation, Rotation, and Scale-Invariant
  Image Registration
 B. Srinivasa Reddy and B. N. Chatterji
 
+TODO:
+    -Get Precision on angle/scale
+    -Check if can tune log_base
+    -images with different sizes
+    
+The scale difference should be reasonable (2x)
+    
+If you crop the images to reasonable size, the algorithm is much faster:
+eg:
+512x512   : 0.06s
+1024x1024 : 0.35s
+4096x4096 : 9s
 
 """
 #import libraries
-#from numpy.fft import irfft2,rfft2, fftshift
-import numpy
+import numpy as np
 import math
-import cv2    
-    
-    
-    
+import cv2
+from scipy.optimize import curve_fit
+
 def register_images(im0,im1):
     """Finds the rotation, scaling and translation of im1 relative to im0
     """
@@ -55,7 +65,7 @@ def dft_resize(im):
 def rotate_scale(im,angle,scale):
     """Rotates and scales the image"""
     rows,cols = im.shape
-    M = cv2.getRotationMatrix2D((cols/2,rows/2),-angle*180/numpy.pi,1/scale)
+    M = cv2.getRotationMatrix2D((cols/2,rows/2),-angle*180/np.pi,1/scale)
     im = cv2.warpAffine(im,M,(cols,rows),
                         borderMode=cv2.BORDER_CONSTANT,
                         flags=cv2.INTER_CUBIC)#REPLICATE
@@ -90,7 +100,7 @@ def pad_img(im,pad):
         ypad=(pad[0],pad[1])
         xpad=(pad[2],pad[3])
         #prepare matrix
-        im=numpy.lib.pad(im,(ypad,xpad),mode='mean')
+        im=np.lib.pad(im,(ypad,xpad),mode='mean')
     return im, offset
     
 def cross_correlation_shift(im0,im1,ylim=None,xlim=None):
@@ -103,13 +113,13 @@ def cross_correlation_shift(im0,im1,ylim=None,xlim=None):
     #Remove mean
     im0=im0-im0.mean()
     im1=im1-im1.mean()
-    #Save shapes as numpy array
-    shape0=numpy.array(im0.shape)
-    shape1=numpy.array(im1.shape)
+    #Save shapes as np array
+    shape0=np.array(im0.shape)
+    shape1=np.array(im1.shape)
     
     #Compute the offset and the pad (yleft,yright,xtop,xbottom)
     offset=1-shape1
-    pad=numpy.lib.pad(-offset,(1,1),mode='edge')
+    pad=np.lib.pad(-offset,(1,1),mode='edge')
     
     #apply limit on padding
     if ylim is not None:
@@ -122,15 +132,15 @@ def cross_correlation_shift(im0,im1,ylim=None,xlim=None):
     im0, offset = pad_img(im0,pad)
     im0=cv2prep(im0)
     #compute Cross correlation matrix
-    xc=cv2.matchTemplate(numpy.float32(im0),numpy.float32(im1),cv2.TM_CCORR)
+    xc=cv2.matchTemplate(np.float32(im0),np.float32(im1),cv2.TM_CCORR)
     #Find maximum of abs (can be anticorrelated)
-    idx=numpy.array(numpy.unravel_index(numpy.argmax(xc),xc.shape))        
+    idx=np.array(np.unravel_index(np.argmax(xc),xc.shape))        
     #Return origin in im0 units
     return idx+offset
     
 def clamp(a):
     """return a between -pi/2 and pi/2 (in fourrier plane, +pi is the same)"""
-    return (a+numpy.pi/2)%numpy.pi - numpy.pi/2
+    return (a+np.pi/2)%np.pi - np.pi/2
 def fill_norm_ccs(ccs):
     ys=ccs.shape[0]
     xs=ccs.shape[1]
@@ -143,8 +153,27 @@ def fill_norm_ccs(ccs):
         ccs[2::2,xs-1]=ccs[1:ys-1:2,xs-1]
         
     return ccs
-          
-def shift_fft(im0,im1, isccs=False):
+        
+def gauss_fit(X,Y):
+    Y[Y<0]=0
+    def gaus(x,a,x0,sigma):
+        return a*np.exp(-(x-x0)**2/(2*sigma**2))
+    mean=(X*Y).sum()/Y.sum()
+    sigma=np.sqrt((Y*((X-mean)**2)).sum()/Y.sum())
+    height=Y.max()
+    return curve_fit(gaus,X,Y,p0=[height,mean,sigma])
+    
+def gauss_fit_log(X,Y):
+    Data=np.log(Y)
+    D=[(Data*X**i).sum() for i in range(3)]
+    X=[(X**i).sum() for i in range(5)]
+    res = (D[0]*X[1]*X[4] - D[0]*X[2]*X[3] - D[1]*X[0]*X[4] + D[1]*X[2]**2 +
+        D[2]*X[0]*X[3] - D[2]*X[1]*X[2])/(2*(D[0]*X[1]*X[3] - D[0]*X[2]**2 -
+        D[1]*X[0]*X[3] + D[1]*X[1]*X[2] + D[2]*X[0]*X[2] - D[2]*X[1]**2))
+    
+    return res
+     
+def shift_fft(im0,im1, isccs=False, subpix=True):
     """The "official" shift method"""
     #TODO: different shapes
     if not isccs:
@@ -159,15 +188,41 @@ def shift_fft(im0,im1, isccs=False):
     xc=cv2.dft(mulSpec/normccs, flags=cv2.DFT_REAL_OUTPUT|cv2.DFT_INVERSE)
     """
     if im0.shape is not im1.shape:
-        shapediff=numpy.array(im0.shape)-numpy.array(im1.shape)
+        shapediff=np.array(im0.shape)-np.array(im1.shape)
         pad0=-shapediff*(shapediff<0)
         pad1=shapediff*(shapediff>0)
-        im0=numpy.lib.pad(im0,((0,pad0[0]),(0,pad0[1])),mode='constant')
-        im1=numpy.lib.pad(im1,((0,pad1[0]),(0,pad1[1])),mode='constant')
+        im0=np.lib.pad(im0,((0,pad0[0]),(0,pad0[1])),mode='constant')
+        im1=np.lib.pad(im1,((0,pad1[0]),(0,pad1[1])),mode='constant')
         """
-    shape=numpy.array(xc.shape)
+    shape=np.array(xc.shape)
     #find max
-    idx=numpy.array(numpy.unravel_index(numpy.argmax(xc),shape)) 
+    idx=np.array(np.unravel_index(np.argmax(xc),shape)) 
+    
+    if subpix:
+        #define search windows
+        X=np.r_[-5:6]
+        #get values along X and Y
+        Y0=np.take(xc[:,idx[1]],np.r_[idx[0]+X[0]:idx[0]+X[-1]+1],mode='wrap')
+        Y1=np.take(xc[idx[0],:],np.r_[idx[1]+X[0]:idx[1]+X[-1]+1],mode='wrap')
+        #Fit a gaussian to the fit
+        cut=3*xc.std()
+        #update idx
+        idx=np.float64(idx)
+        idx[0]+=gauss_fit_log(X[Y0>cut],Y0[Y0>cut])
+        idx[1]+=gauss_fit_log(X[Y1>cut],Y1[Y1>cut])
+        
+        """
+        import matplotlib.pyplot as plt
+        plt.figure(0+a)
+        plt.plot(X,Y0,'x',label='data')
+        plt.plot([popt0[1],popt0[1]],[1,Y0.max()],label='fit')
+        plt.plot([i,i],[1,Y0.max()],label='logfit')
+        plt.figure(1+a)
+        plt.plot(X,Y1,'x',label='data')
+        plt.plot([popt1[1],popt1[1]],[1,Y1.max()],label='fit')
+        plt.plot([j,j],[1,Y1.max()],label='logfit')
+        """
+        
     #restrics to reasonable values
     idx[idx>shape//2]-=shape[idx>shape//2]
     return idx
@@ -188,7 +243,19 @@ def find_rotation_scale(im0,im1,isccs=False):
                                            anglestep=anglestep,
                                            islogr=True,
                                            isccs=isccs)
-    angle, scale = shift_fft(cv2.log(lp0),cv2.log(lp1))     
+    angle, scale = shift_fft(cv2.log(lp0),cv2.log(lp1))
+
+    """
+    import matplotlib.pyplot as plt
+    da=-np.pi/3/anglestep-angle
+    ds=math.log(1/1.6,log_base)-scale
+    plt.figure(0)#angle np.pi/3
+    plt.plot([da,da],[1,12000],label='exact')
+    plt.figure(1)#scale 1.6
+    plt.plot([ds,ds],[1,12000],label='exact')
+    """
+
+     
     #get angle in correct units
     angle*=anglestep
     #get scale in linear units
@@ -201,13 +268,13 @@ def find_rotation_scale(im0,im1,isccs=False):
     """
     ,alim=None,slim=None):
     if alim is None:
-        alim=[-numpy.pi/2,numpy.pi/2]
+        alim=[-np.pi/2,np.pi/2]
     #transform the limit in pixel size
-    alim= numpy.int64((numpy.array(alim))/anglestep)
+    alim= np.int64((np.array(alim))/anglestep)
     if slim is not None:
-        slim=numpy.int64(numpy.log(slim)/numpy.log(log_base))
+        slim=np.int64(np.log(slim)/np.log(log_base))
     #compute the cross correlattion to extract the angle and scale     
-    angle,scale= cross_correlation_shift(numpy.log(lp0),numpy.log(lp1),
+    angle,scale= cross_correlation_shift(np.log(lp0),np.log(lp1),
                                          ylim=alim,xlim=slim,
                                          ypadmode='wrap')
     
@@ -233,7 +300,7 @@ def centered_mag_sq_CCS(image):
     xs=image.shape[1]
     
     #get correct size return
-    ret=numpy.zeros((ys,xs//2+1))
+    ret=np.zeros((ys,xs//2+1))
     
     #first column:
     #center
@@ -279,16 +346,16 @@ def polar_fft(image, isccs=False, anglestep=None, radiimax=None,
     
     #the center is shifted from 0,0 to the ~ center 
     #(eg. if 4x4 image, the center is at [2,2], as if 5x5)
-    qshape = numpy.array([image.shape[0]//2,image.shape[1]])
-    center = numpy.array([qshape[0],0]) 
+    qshape = np.array([image.shape[0]//2,image.shape[1]])
+    center = np.array([qshape[0],0]) 
     
     #if the angle Step is not given, take the number of pixel
     #on the perimeter as the target #=range/step
     if anglestep is None:
-        anglestep=numpy.pi/qshape.min()/2#range is pi, nbangle = 2r =~pi r
+        anglestep=np.pi/qshape.min()/2#range is pi, nbangle = 2r =~pi r
     
     #get the theta range
-    theta=numpy.arange(-numpy.pi/2,numpy.pi/2,anglestep,dtype=numpy.float32)
+    theta=np.arange(-np.pi/2,np.pi/2,anglestep,dtype=np.float32)
     
     #For the radii, the units are comparable if the log_base and radiimax are
     #the same. Therefore, log_base is deduced from radiimax
@@ -302,20 +369,20 @@ def polar_fft(image, isccs=False, anglestep=None, radiimax=None,
         #The log base solves log_radii_max=log_{log_base}(linear_radii_max)
         #where we decided arbitrarely that linear_radii_max=log_radii_max
         log_base=math.exp(math.log(radiimax) / radiimax)
-        radius = ((log_base ** numpy.arange(0,radiimax,dtype=numpy.float32))
+        radius = ((log_base ** np.arange(0,radiimax,dtype=np.float32))
                     /radiimax)
     else:
-        radius = numpy.linspace(0,1,radiimax, endpoint=False,
-                                    dtype=numpy.float32)
+        radius = np.linspace(0,1,radiimax, endpoint=False,
+                                    dtype=np.float32)
     
     #get x y coordinates matrix (The units are 0 to 1, therefore a circle is
     #represented as an ellipse)
-    y=cv2.gemm(numpy.sin(theta),radius,qshape[0],0,0,
+    y=cv2.gemm(np.sin(theta),radius,qshape[0],0,0,
                flags=cv2.GEMM_2_T)+center[0]
-    x=cv2.gemm(numpy.cos(theta),radius,qshape[1],0,0,
+    x=cv2.gemm(np.cos(theta),radius,qshape[1],0,0,
                flags=cv2.GEMM_2_T)+center[1]
-    #y = qshape[0]*radius * numpy.sin(theta) + center[0]
-    #x = qshape[1]*radius * numpy.cos(theta) + center[1]
+    #y = qshape[0]*radius * np.sin(theta) + center[0]
+    #x = qshape[1]*radius * np.cos(theta) + center[1]
     
     #get output
     output=cv2.remap(image,x,y,cv2.INTER_LINEAR)#LINEAR, CUBIC,LANCZOS4
@@ -329,5 +396,5 @@ def cv2prep(im,dtype=None):
     if dtype is 'uint8':
         im=im-im.min()
         im=im/(im.max()/255)
-        return numpy.uint8(im)
+        return np.uint8(im)
     return im
