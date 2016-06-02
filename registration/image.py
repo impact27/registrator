@@ -17,7 +17,6 @@ B. Srinivasa Reddy and B. N. Chatterji
 """
 #import libraries
 #from numpy.fft import irfft2,rfft2, fftshift
-from numpy.fft import fftshift
 import numpy
 import math
 import cv2    
@@ -144,8 +143,7 @@ def fill_norm_ccs(ccs):
         ccs[2::2,xs-1]=ccs[1:ys-1:2,xs-1]
         
     return ccs
-        
-        
+          
 def shift_fft(im0,im1, isccs=False):
     """The "official" shift method"""
     #TODO: different shapes
@@ -154,12 +152,11 @@ def shift_fft(im0,im1, isccs=False):
         __,im1=dft_resize(im1)
     
     mulSpec=cv2.mulSpectrums(im0,im1,flags=0,conjB=True)
-    normccs=numpy.sqrt(cv2.mulSpectrums(im0,im0,flags=0,conjB=True)*
+    normccs=cv2.sqrt(cv2.mulSpectrums(im0,im0,flags=0,conjB=True)*
                        cv2.mulSpectrums(im1,im1,flags=0,conjB=True))
     normccs=fill_norm_ccs(normccs)
     
     xc=cv2.dft(mulSpec/normccs, flags=cv2.DFT_REAL_OUTPUT|cv2.DFT_INVERSE)
-    
     """
     if im0.shape is not im1.shape:
         shapediff=numpy.array(im0.shape)-numpy.array(im1.shape)
@@ -174,8 +171,7 @@ def shift_fft(im0,im1, isccs=False):
     #restrics to reasonable values
     idx[idx>shape//2]-=shape[idx>shape//2]
     return idx
-    
-    
+     
 def find_rotation_scale(im0,im1,isccs=False):
     """Compares the images and return the best guess for the rotation angle,
     and scale difference
@@ -192,7 +188,7 @@ def find_rotation_scale(im0,im1,isccs=False):
                                            anglestep=anglestep,
                                            islogr=True,
                                            isccs=isccs)
-    angle, scale = shift_fft(numpy.log(lp0),numpy.log(lp1))     
+    angle, scale = shift_fft(cv2.log(lp0),cv2.log(lp1))     
     #get angle in correct units
     angle*=anglestep
     #get scale in linear units
@@ -226,27 +222,38 @@ def centered_mag_sq_CCS(image):
     """return centered squared magnitude
     
     Check doc Intel* Image Processing Library
-    https://www.comp.nus.edu.sg/~cs4243/doc/ipl.pdf"""
+    https://www.comp.nus.edu.sg/~cs4243/doc/ipl.pdf
+    
+    The center is at position (ys//2, 0)    
+    """
     #multiply image by image* to get squared magnitude
     image=cv2.mulSpectrums(image,image,flags=0,conjB=True)    
     
     ys=image.shape[0]
     xs=image.shape[1]
+    
     #get correct size return
     ret=numpy.zeros((ys,xs//2+1))
-    #fill easy center column
-    ret[:,1:]=image[:,1::2]
+    
+    #first column:
     #center
-    ret[0,0]=image[0,0]
-    #first part first column
-    ret[1:ys//2+1,0]=image[1::2,0]
-    #copy first part first column
-    ret[:ys//2:-1,0]=ret[1:(ys-1)//2+1,0]
+    ret[ys//2,0]=image[0,0]
+    #bottom
+    ret[ys//2+1:,0]=image[1:ys-1:2,0]   
+    #top (Inverted copy bottom)
+    ret[ys//2-1::-1,0]=image[1::2,0] 
+    
+    #center columns
+    ret[ys//2:,1:]=image[:(ys-1)//2+1,1::2]
+    ret[:ys//2,1:]=image[(ys-1)//2+1:,1::2]
+    
     #correct last line if even
     if xs%2 is 0:
-        ret[1:ys//2+1,xs//2]=image[1::2,xs-1]   
-        ret[ys//2+1:,xs//2]=0
-    return fftshift(ret,(0,))
+        ret[ys//2+1:,xs//2]=image[1:ys-1:2,xs-1]   
+        ret[:ys//2,xs//2]=0
+        
+    return ret
+   
 def polar_fft(image, isccs=False, anglestep=None, radiimax=None,
               islogr=False):
     """Return fft in polar (or log-polar) units
@@ -278,24 +285,16 @@ def polar_fft(image, isccs=False, anglestep=None, radiimax=None,
     #if the angle Step is not given, take the number of pixel
     #on the perimeter as the target #=range/step
     if anglestep is None:
-        anglestep=1/qshape.min()
+        anglestep=numpy.pi/qshape.min()/2#range is pi, nbangle = 2r =~pi r
     
     #get the theta range
-    thetalin=numpy.arange(-numpy.pi/2,numpy.pi/2,anglestep,dtype=numpy.float32)
-    nbangles=thetalin.size
+    theta=numpy.arange(-numpy.pi/2,numpy.pi/2,anglestep,dtype=numpy.float32)
     
     #For the radii, the units are comparable if the log_base and radiimax are
     #the same. Therefore, log_base is deduced from radiimax
     #The step is assumed to be 1
     if radiimax is None:
         radiimax = qshape.min()
-        
-    #fill theta matrix
-    theta = numpy.empty((nbangles, radiimax), dtype=numpy.float32)
-    theta.T[:] = thetalin
-    
-    #fill radius matrix
-    radius = numpy.empty_like(theta)
     
     #also as the circle is an ellipse in the image, 
     #we want the radius to be from 0 to 1
@@ -303,16 +302,20 @@ def polar_fft(image, isccs=False, anglestep=None, radiimax=None,
         #The log base solves log_radii_max=log_{log_base}(linear_radii_max)
         #where we decided arbitrarely that linear_radii_max=log_radii_max
         log_base=math.exp(math.log(radiimax) / radiimax)
-        radius[:] = ((log_base ** numpy.arange(0,radiimax,dtype=numpy.float32))
+        radius = ((log_base ** numpy.arange(0,radiimax,dtype=numpy.float32))
                     /radiimax)
     else:
-        radius[:] = numpy.linspace(0,1,radiimax, endpoint=False,
+        radius = numpy.linspace(0,1,radiimax, endpoint=False,
                                     dtype=numpy.float32)
     
     #get x y coordinates matrix (The units are 0 to 1, therefore a circle is
     #represented as an ellipse)
-    y = qshape[0]*radius * numpy.sin(theta) + center[0]
-    x = qshape[1]*radius * numpy.cos(theta) + center[1]
+    y=cv2.gemm(numpy.sin(theta),radius,qshape[0],0,0,
+               flags=cv2.GEMM_2_T)+center[0]
+    x=cv2.gemm(numpy.cos(theta),radius,qshape[1],0,0,
+               flags=cv2.GEMM_2_T)+center[1]
+    #y = qshape[0]*radius * numpy.sin(theta) + center[0]
+    #x = qshape[1]*radius * numpy.cos(theta) + center[1]
     
     #get output
     output=cv2.remap(image,x,y,cv2.INTER_LINEAR)#LINEAR, CUBIC,LANCZOS4

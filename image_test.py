@@ -34,6 +34,7 @@ figure()
 plotreg(photo,im2, origin)
 
 #%%
+"""
 importlib.reload(ir)
 im0=photo
 im1=part
@@ -52,3 +53,4 @@ plot(lp0.mean(1))
 plot(lp1.mean(1))
 
 ir.shift_fft(lp0,lp1)
+"""
