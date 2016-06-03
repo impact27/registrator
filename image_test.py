@@ -20,7 +20,6 @@ def plotreg(im0,im2,origin):
     imshow(cr.edge(im2),extent=ir.get_extent(origin, im2.shape),alpha=0.5)
     show()
 #%% test with actual image
-#This doesn't work... -> add filtering?
 photo=mpimg.imread('IMG.jpg')
 photo=photo.sum(-1)
 #%%
@@ -30,8 +29,8 @@ part=ir.rotate_scale(numpy.float32(photo),numpy.pi/3,1.2)
 importlib.reload(ir)
 angle, scale, origin, im2=ir.register_images(numpy.float32(photo),
                                              numpy.float32(part))
-#"""
 #%%
+#"""
 figure()
 plotreg(photo,im2, origin)
 

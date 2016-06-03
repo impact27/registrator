@@ -117,3 +117,9 @@ def register_channel(im0,im1,scale=None,ch0angle=None):
     #return all infos
     return angle, scale, [y, x], im2
     
+    
+def uint8sc(im):
+    """scale the image to fit in a uint8"""
+    im=im-im.min()
+    im=im/(im.max()/255)
+    return np.uint8(im)
