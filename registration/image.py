@@ -115,8 +115,8 @@ def cross_correlation_shift(im0,im1,ylim=None,xlim=None):
     im0=im0-im0.mean()
     im1=im1-im1.mean()
     #Save shapes as np array
-    shape0=np.array(im0.shape)
-    shape1=np.array(im1.shape)
+    shape0=np.asarray(im0.shape)
+    shape1=np.asarray(im1.shape)
     
     #Compute the offset and the pad (yleft,yright,xtop,xbottom)
     offset=1-shape1
@@ -131,11 +131,10 @@ def cross_correlation_shift(im0,im1,ylim=None,xlim=None):
         pad[3]=xlim[1]+(shape1-shape0)[1]
     
     im0, offset = pad_img(im0,pad)
-    im0=cv2prep(im0)
     #compute Cross correlation matrix
     xc=cv2.matchTemplate(np.float32(im0),np.float32(im1),cv2.TM_CCORR)
     #Find maximum of abs (can be anticorrelated)
-    idx=np.array(np.unravel_index(np.argmax(xc),xc.shape))        
+    idx=np.asarray(np.unravel_index(np.argmax(xc),xc.shape))        
     #Return origin in im0 units
     return idx+offset
     
@@ -156,6 +155,11 @@ def fill_norm_ccs(ccs):
     return ccs
         
 def gauss_fit(X,Y):
+    """
+    Fit the function to a gaussian.
+    
+    /!\ This uses a slow curve_fit function! do not use if need speed!
+    """
     Y[Y<0]=0
     def gaus(x,a,x0,sigma):
         return a*np.exp(-(x-x0)**2/(2*sigma**2))
@@ -165,20 +169,61 @@ def gauss_fit(X,Y):
     return curve_fit(gaus,X,Y,p0=[height,mean,sigma])
     
 def gauss_fit_log(X,Y):
-    print(Y.shape)
+    """
+    Fit the log of the input to the log of a gaussian.
+    
+    The least square method is used. 
+    As this is a log, make sure the amplitude is >> noise
+    """
     Data=np.log(Y)
     D=[(Data*X**i).sum() for i in range(3)]
     X=[(X**i).sum() for i in range(5)]
-    num=(D[0]*X[1]*X[4] - D[0]*X[2]*X[3] - D[1]*X[0]*X[4] + D[1]*X[2]**2 +
-        D[2]*X[0]*X[3] - D[2]*X[1]*X[2])
-    den=(2*(D[0]*X[1]*X[3] - D[0]*X[2]**2 -
-        D[1]*X[0]*X[3] + D[1]*X[1]*X[2] + D[2]*X[0]*X[2] - D[2]*X[1]**2))
-    res = 0
-    if den > 0.00001:
-        print(num,den)
-        res=num/den
+    num=(D[0]*(X[1]*X[4] - X[2]*X[3]) +
+         D[1]*(X[2]**2   - X[0]*X[4]) +
+         D[2]*(X[0]*X[3] - X[1]*X[2]))
+    den=2*(D[0]*(X[1]*X[3] - X[2]**2) + 
+           D[1]*(X[1]*X[2] - X[0]*X[3]) +
+           D[2]*(X[0]*X[2] - X[1]**2))
+    varnum=(-X[0]*X[2]*X[4] + X[0]*X[3]**2 + X[1]**2*X[4] -
+            2*X[1]*X[2]*X[3] + X[2]**3)
+    if abs(den) < 0.00001:
+        print('Warning: zero denominator!',den)
+        return None
+    mean=num/den
+    var=varnum/den
+    if var<0:
+        print('Warning: negative Variance!',var)
+        return None
+    return mean,var
+def COM(X,Y):
+    """
+    Get center of mass
+    """
+    return (X*Y).sum()/Y.sum()
     
-    return res
+def getVal(X,Y,cut):
+    #isolate peak
+    peak=Y>cut
+    peak,__=label(peak)
+    peak=peak==peak[5]
+    
+    #get X any Y values corresponding to peak
+    X=X[peak]
+    Y=Y[peak]
+    
+    #if>2, use fit_log
+    if peak.sum() > 2:
+        ret,__=gauss_fit_log(X,Y)
+        #if fails, use COM
+        if ret is None:
+            ret=COM(X,Y)
+    #if>1, use COM
+    elif peak.sum() >1:
+        ret=COM(X,Y)
+    else:
+        #default is 0
+        ret=0
+    return ret
      
 def shift_fft(im0,im1, isccs=False, subpix=True):
     """The "official" shift method"""
@@ -201,9 +246,9 @@ def shift_fft(im0,im1, isccs=False, subpix=True):
         im0=np.lib.pad(im0,((0,pad0[0]),(0,pad0[1])),mode='constant')
         im1=np.lib.pad(im1,((0,pad1[0]),(0,pad1[1])),mode='constant')
         """
-    shape=np.array(xc.shape)
+    shape=np.asarray(xc.shape)
     #find max
-    idx=np.array(np.unravel_index(np.argmax(xc),shape)) 
+    idx=np.asarray(np.unravel_index(np.argmax(xc),shape)) 
     
     if subpix:
         #define search windows
@@ -214,52 +259,9 @@ def shift_fft(im0,im1, isccs=False, subpix=True):
         #Extract peak
         cut=3*xc.std()
         #update idx
-        idx=np.float64(idx)
-        
-        #0   
-        def getVal(X,Y,cut):
-            #isolate peak
-            peak=Y>cut
-            peak=label(peak)
-            peak=peak==peak[5]
-            
-            X=X[peak]
-            Y=Y[peak]
-            
-            #default is 0
-            ret=0
-            #if>2, use fit_log
-            if peak.sum() > 2:
-                ret=gauss_fit_log(X,Y)
-            #if>1, use COM
-            elif peak.sum() >1:
-                ret=(X*Y).sum()/Y.sum()
-        
+        idx=np.float64(idx)        
         idx[0]+=getVal(X,Y0,cut)
         idx[1]+=getVal(X,Y1,cut)
-        
-        
-        
-        i=getVal(X,Y0,cut)
-        j=getVal(X,Y1,cut)
-        """
-        idx[0]+=i
-        idx[1]+=j
-        
-        popt0,__=gauss_fit(X,Y0)
-        popt1,__=gauss_fit(X,Y1)
-        """
-        import matplotlib.pyplot as plt
-        plt.figure()
-        plt.plot(X,Y0,'x',label='data')
-        #plt.plot([popt0[1],popt0[1]],[1,Y0.max()],label='fit')
-        plt.plot([i,i],[1,Y0.max()],label='logfit')
-        plt.plot([-5,5],[cut,cut])
-        plt.figure()
-        plt.plot(X,Y1,'x',label='data')
-        #plt.plot([popt1[1],popt1[1]],[1,Y1.max()],label='fit')
-        plt.plot([j,j],[1,Y1.max()],label='logfit')
-        plt.plot([-5,5],[cut,cut])
         
     #restrics to reasonable values
     idx[idx>shape//2]-=shape[idx>shape//2]
@@ -276,8 +278,7 @@ def find_rotation_scale(im0,im1,isccs=False):
     """
     #Get log polar coordinates. choose the log base 
     lp1, anglestep, log_base=polar_fft(im1, islogr=True,isccs=isccs)
-    lp0, anglestep, log_base=polar_fft(im0,
-                                           radiimax=lp1.shape[1], 
+    lp0, anglestep, log_base=polar_fft(im0,radiimax=lp1.shape[1], 
                                            anglestep=anglestep,
                                            islogr=True,
                                            isccs=isccs)
@@ -373,8 +374,8 @@ def polar_fft(image, isccs=False, anglestep=None, radiimax=None,
     
     #the center is shifted from 0,0 to the ~ center 
     #(eg. if 4x4 image, the center is at [2,2], as if 5x5)
-    qshape = np.array([image.shape[0]//2,image.shape[1]])
-    center = np.array([qshape[0],0]) 
+    qshape = np.asarray([image.shape[0]//2,image.shape[1]])
+    center = np.asarray([qshape[0],0]) 
     
     #if the angle Step is not given, take the number of pixel
     #on the perimeter as the target #=range/step
@@ -418,10 +419,26 @@ def polar_fft(image, isccs=False, anglestep=None, radiimax=None,
         return output, anglestep, log_base
     else:
         return output, anglestep
-def cv2prep(im,dtype=None):
-    """Prepare the image to be used with opencv (8bit image)"""
-    if dtype is 'uint8':
-        im=im-im.min()
-        im=im/(im.max()/255)
-        return np.uint8(im)
-    return im
+def uint8sc(im):
+    """scale the image to fit in a uint8"""
+    im=im-im.min()
+    im=im/(im.max()/255)
+    return np.uint8(im)
+    
+    
+    
+"""
+i=getVal(X,Y0,cut)
+j=getVal(X,Y1,cut)
+import matplotlib.pyplot as plt
+plt.figure()
+plt.plot(X,Y0,'x',label='data')
+#plt.plot([popt0[1],popt0[1]],[1,Y0.max()],label='fit')
+plt.plot([i,i],[1,Y0.max()],label='logfit')
+plt.plot([-5,5],[cut,cut])
+plt.figure()
+plt.plot(X,Y1,'x',label='data')
+#plt.plot([popt1[1],popt1[1]],[1,Y1.max()],label='fit')
+plt.plot([j,j],[1,Y1.max()],label='logfit')
+plt.plot([-5,5],[cut,cut])
+"""

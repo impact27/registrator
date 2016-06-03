@@ -78,7 +78,7 @@ def edge(im):
     This scale the image to be used with Canny from OpenCV    
     """
     #map the 16bit image into 8bit   
-    e0=cv2.Canny(reg.cv2prep(im,dtype='uint8'),100,200)
+    e0=cv2.Canny(reg.uint8sc(im),100,200)
     return e0
     
 def register_channel(im0,im1,scale=None,ch0angle=None):
