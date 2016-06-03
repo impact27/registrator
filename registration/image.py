@@ -232,6 +232,7 @@ def polar_fft(image, isccs=False, anglestep=None, radiimax=None,
     log_base is the base of the log. It is deduced from radiimax.
     Two images that will be compared should therefore have the same radiimax.
     """
+    image=np.float32(image)
     #get dft if not already done
     if not isccs:
         image=dft_optsize(image)

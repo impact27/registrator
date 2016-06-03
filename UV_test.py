@@ -32,7 +32,7 @@ for i in range(1000):
 
 
 #%%
-"""
+#"""
 figure(0)
 imshow(im0)
 figure(1)
@@ -71,7 +71,7 @@ semilogy(lp0.mean(1))
 #%%
 import matplotlib.pyplot as plt
 import cv2
-img = cv2.medianBlur(ir.cv2prep(im0,dtype='uint8'),11)
+img = cv2.medianBlur(cr.uint8sc(im0),11)
 th3 = cv2.adaptiveThreshold(img,255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
                             cv2.THRESH_BINARY_INV,101,
                             np.uint8(np.std(img)))
