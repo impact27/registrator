@@ -31,7 +31,7 @@ angle, scale, origin, im2=ir.register_images(np.float32(photo),
                                              np.float32(part))
 #%%
 #"""
-figure()
+figure(2)
 plotreg(photo,im2, origin)
 
 #%%

@@ -4,8 +4,9 @@ Created on Wed May 18 16:53:44 2016
 
 @author: quentinpeter
 """
-from numpy.fft import rfft2, fftshift,irfft
+from numpy.fft import irfft
 from scipy.ndimage.interpolation import map_coordinates
+from scipy.ndimage.filters import gaussian_filter
 import math
 import numpy as np
 from . import image as reg
@@ -32,11 +33,14 @@ def channel_width(im,chanangle=None,isccsedge=False):
     #Compute the fft if it is not already done
     if not isccsedge:
         im= reg.dft_optsize(np.float32(edge(im)))
-    #if the channel direction is not given, deduce it from channel_angle
-    if chanangle is None:
-        chanangle = channel_angle(im,isccsedge=True) 
+        
     #get centered magnitude squared
     im = reg.centered_mag_sq_ccs(im)
+    
+    #if the channel direction is not given, deduce it from channel_angle
+    if chanangle is None:
+        chanangle = channel_angle(im,isshiftdftedge=True) 
+    
     #get vector perpendicular to angle
     fdir=np.asarray([math.cos(chanangle),-math.sin(chanangle)])#y,x = 0,1
     #need to be in the RHS of the cadran for rfft
@@ -53,23 +57,42 @@ def channel_width(im,chanangle=None,isccsedge=False):
     idx=((fdir*shape)[:,np.newaxis].dot(pos[np.newaxis])
          +center[:,np.newaxis])
     #get the line
-    f=map_coordinates(im,idx)
+    idx=np.float32(idx)
+    f=cv2.remap(np.float32(im),idx[1,:],idx[0,:],cv2.INTER_LINEAR)
+    f=np.squeeze(f)
     #The central line of the fft will have a periodic feature for parallel
     #lines which we can detect with fft
     f=abs(irfft(f**2))
+    #filter to avoid "interferences"
+    f=gaussian_filter(f,1)
     #the offset is determined by the first pixel below mean
     wmin=np.nonzero(f-f.mean()<0)[0][0]
-    #find max excluding the first few points
-    return (wmin+f[wmin:f.size//2].argmax())
     
-def channel_angle(im,isccsedge=False):
+    """
+    import matplotlib.pyplot as plt
+    plt.figure()
+    plt.plot(f,'x')
+    plt.plot([wmin,wmin],[0,f.max()])
+    plt.plot([0,500],[f.mean()+3*f.std(),f.mean()+3*f.std()])
+    #"""
+    
+    #find max excluding the first few points
+    return (wmin+f[wmin:f.size//2].argmax()), chanangle
+    
+def channel_angle(im,isshiftdftedge=False):
     """Extract the channel angle from the rfft"""
     #Compute edge
-    if not isccsedge:
+    if not isshiftdftedge:
         im=edge(im)
     #compute log fft
-    lp, anglestep=reg.polar_fft(im,isccs=isccsedge)  
-    
+    lp, anglestep=reg.polar_fft(im,isshiftdft=isshiftdftedge)  
+    """
+    import matplotlib.pyplot as plt
+    plt.figure()
+    plt.plot(lp.sum(-1),'x')
+    plt.figure()
+    plt.plot(np.log(lp).sum(-1),'x')
+    #"""
     #return max-pi/2
     return reg.clamp_angle(lp.sum(-1).argmax()*anglestep-np.pi/2)
     
@@ -94,32 +117,30 @@ def register_channel(im0,im1,scale=None,ch0angle=None):
     e1=edge(im1)
     fe0, fe1=reg.dft_optsize_same(np.float32(e0),np.float32(e1))
     
-    #get angle from biggest angular feature
-    a0=channel_angle(fe0,isccsedge=True)
-    a1=channel_angle(fe1,isccsedge=True)
+    #compute the angle and channel width of biggest angular feature
+    w0,a0=channel_width(fe0,isccsedge=True)
+    w1,a1=channel_width(fe1,isccsedge=True)
+    
+    #get angle diff
     angle=reg.clamp_angle(a0-a1)
     if ch0angle is not None:
         a0=ch0angle
         a1=a0-angle 
-    #if the scale is unknown, assume channels in y direction (axis 0)
+        
+    #if the scale is unknown, ratio of the channels
     if scale is None:
-        #as we work with channels, try to deduce from width
-        w0=channel_width(fe0,chanangle=a0,isccsedge=True)
-        w1=channel_width(fe1,chanangle=a1,isccsedge=True)
         scale=w1/w0
     #scale and rotate
-    im2=reg.rotate_scale(im1,angle,scale)
+    e2=reg.rotate_scale(e1,angle,scale)
     #get edge from scaled and rotated im1
-    #TODO: Remove the edges in e2 (use cv2.BORDER_REPLICATE?)
-    e2=edge(im2)
+    fe2=reg.dft_optsize(np.float32(e2),shape=fe0.shape)
     #find offset
-    y,x=reg.find_shift_cc(e0,e2)
+    y,x=reg.find_shift_dft(fe0,fe2, isccs=True)
     #return all infos
-    return angle, scale, [y, x], im2
-    
+    return angle, scale, [y, x], e2
     
 def uint8sc(im):
-    """scale the image to fit in a uint8"""
-    im=im-im.min()
-    im=im/(im.max()/255)
-    return np.uint8(im)
+    immin=im.min()
+    immax=im.max()
+    imrange=immax-immin
+    return cv2.convertScaleAbs(im-immin, alpha=255/imrange)

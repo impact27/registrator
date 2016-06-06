@@ -26,6 +26,7 @@ im0=np.float32(im0)
 im1=np.float32(im1)
 #%%
 importlib.reload(ir)
+#%%
 for i in range(1000):
     ir.register_images(im0,im1)
 

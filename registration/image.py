@@ -16,6 +16,7 @@ eg:
 
 TODO:
     -Add np.asarray to every input that should be a numpy array
+    -the input type is not well handeled
     
 based on:
     
@@ -65,9 +66,13 @@ def find_rotation_scale(im0,im1,isccs=False):
     If the images are already DFT and in the CCS format, set isccs to True.
     Otherwise the function does it for you
     """
+    #if ccs, convert to shifted dft before giving to polar_fft
+    if isccs:    
+        im0=centered_mag_sq_ccs(im0)
+        im1=centered_mag_sq_ccs(im1)
     #Get log polar coordinates. choose the log base 
-    lp1, anglestep, log_base=polar_fft(im1, islogr=True, isccs=isccs)
-    lp0, anglestep, log_base=polar_fft(im0, islogr=True, isccs=isccs,
+    lp1, anglestep, log_base=polar_fft(im1, islogr=True, isshiftdft=isccs)
+    lp0, anglestep, log_base=polar_fft(im0, islogr=True, isshiftdft=isccs,
                                             radiimax=lp1.shape[1], 
                                             anglestep=anglestep)
     #Find the shift with log of the log-polar images,
@@ -90,6 +95,9 @@ def find_shift_dft(im0,im1, isccs=False, subpix=True):
     In that case the images should have the same size.  
     
     If subpix is True, a gaussian fit is used for subpix precision
+    
+    If the image are expected to match at several places (channels), 
+    use blurres
     """
     if not isccs:
         im0,im1=dft_optsize_same(im0,im1)
@@ -105,24 +113,32 @@ def find_shift_dft(im0,im1, isccs=False, subpix=True):
     #compute the inverse DFT    
     xc=cv2.dft(ccs_normalize(mulSpec,normccs),
                flags=cv2.DFT_REAL_OUTPUT|cv2.DFT_INVERSE)
+    #Blur xc to remove some noise and improve the subpixel detection
+    #workaround as GaussianBlur doesn't work with BORDER_WRAP
+    blurRadii=2
+    xc = cv2.copyMakeBorder(xc, blurRadii, blurRadii, blurRadii, blurRadii, 
+                            borderType=cv2.BORDER_WRAP)
+    xc = cv2.GaussianBlur(xc,(2*blurRadii+1,2*blurRadii+1),1.5)
+    xc=xc[blurRadii:-blurRadii,blurRadii:-blurRadii]
     #save shape
     shape=np.asarray(xc.shape)
     #find max
     idx=np.asarray(np.unravel_index(np.argmax(xc),shape)) 
     
+    """   
+    plt.figure()
+    from numpy.fft import fftshift
+    plt.imshow(fftshift(xc))
+    print(idx)
+    #"""
+     
     if subpix:
-        #define search windows
-        X=np.r_[-5:6]
-        #get values along X and Y
-        Y0=np.take(xc[:,idx[1]],np.r_[idx[0]+X[0]:idx[0]+X[-1]+1],mode='wrap')
-        Y1=np.take(xc[idx[0],:],np.r_[idx[1]+X[0]:idx[1]+X[-1]+1],mode='wrap')
         #update idx
-        idx=np.float64(idx)        
-        idx[0]+=get_peak_pos(X,Y0)
-        idx[1]+=get_peak_pos(X,Y1)
-        
-    #restrics to reasonable values
-    idx[idx>shape//2]-=shape[idx>shape//2]
+        idx=np.asarray([get_peak_pos(xc[:,idx[1]],wrap=True),
+                        get_peak_pos(xc[idx[0],:],wrap=True)])
+    else:
+        #restrics to reasonable values
+        idx[idx>shape//2]-=shape[idx>shape//2]
     return idx
 
 
@@ -215,7 +231,7 @@ def rotate_scale(im,angle,scale):
     return im
     
 
-def polar_fft(image, isccs=False, anglestep=None, radiimax=None,
+def polar_fft(image, isshiftdft=False, anglestep=None, radiimax=None,
               islogr=False):
     """Return dft in polar (or log-polar) units, the angle step 
     (and the log base)
@@ -234,11 +250,8 @@ def polar_fft(image, isccs=False, anglestep=None, radiimax=None,
     """
     image=np.float32(image)
     #get dft if not already done
-    if not isccs:
-        image=dft_optsize(image)
-        
-    #recenter dft
-    image=centered_mag_sq_ccs(image)
+    if not isshiftdft:
+        image=centered_mag_sq_ccs(dft_optsize(image))
     
     #the center is shifted from 0,0 to the ~ center 
     #(eg. if 4x4 image, the center is at [2,2], as if 5x5)
@@ -388,14 +401,14 @@ def gauss_fit_log(X,Y):
     #if denominator is 0, can't do anything
     if abs(den) < 0.00001:
         print('Warning: zero denominator!',den)
-        return None
+        return np.nan,np.nan
     #compute mean and variance
     mean=num/den
     var=varnum/den
     #if variance is negative, the data are not a gaussian
     if var<0:
         print('Warning: negative Variance!',var)
-        return None
+        return np.nan,np.nan
     return mean,var
     
     
@@ -404,39 +417,67 @@ def center_of_mass(X,Y):
     return (X*Y).sum()/Y.sum()
     
     
-def get_peak_pos(X,Y):
-    """Get the peak position"""
-    #get cut value (10% biggest peak)
-    cut = .1*Y.max()    
+def get_peak_pos(data,wrap=False):
+    """Get the peak position
+
+    The data is assumed to wrap    
+    """ 
+    #get maximum value
+    argmax=data.argmax()
+    dsize=data.size
+    #get cut value (30% biggest peak)
+    #TODO: choose less random value
+    cut = .3*data[argmax]
     #isolate peak
-    peak=Y>cut
+    peak=data>cut
     peak,__=label(peak)
-    peak=peak==peak[5]
+    #wrap border
+    if peak[0]!=0 and peak[-1]!=0 and peak[0]!=peak[-1]:
+        peak[peak==peak[-1]]=peak[0]
+    #extract peak
+    peak=peak==peak[argmax]
     
-    #get X any Y values corresponding to peak
-    X=X[peak]
-    Y=Y[peak]
+    #get values along X and Y
+    X=np.arange(dsize)[peak]
+    Y=data[peak]
+    if wrap:
+        #wrap X values d
+        X[X>dsize//2]-=dsize
+        
+    #remove argmax as in X**4 X should be small
+    offset=X[Y==Y.max()][0]
+    X-=offset
     
     #if>2, use fit_log
     if peak.sum() > 2:
         ret,__=gauss_fit_log(X,Y)
         #if fails, use center_of_mass
-        if ret is None:
+        if ret is np.nan:
             ret=center_of_mass(X,Y)
     elif peak.sum() >1:
         #If only 2 pixel, gauss fitting is imposible, use center_of_mass
         ret=center_of_mass(X,Y)
     else:
         #1 px peak is easy
-        ret=0
-    return ret
+        ret=X[0]
+        
+        
+    """
+    import matplotlib.pyplot as plt
+    plt.figure()
+    plt.plot(X,Y,'x',label='data')
+    plt.plot([ret,ret],[1,Y.max()],label='logfit')
+    plt.plot([X.min(),X.max()],[cut,cut])
+    plt.plot([X.min(),X.max()],[data.std(),data.std()])
+    #"""
+    
+    return ret+offset
     
 
 def get_extent(origin, shape):
     """Computes the extent for imshow() (see matplotlib doc)"""
     return [origin[1],origin[1]+shape[1],origin[0]+shape[0],origin[0]]
-    
-    
+      
 def centered_mag_sq_ccs(image):
     """return centered squared magnitude
     
@@ -472,22 +513,3 @@ def centered_mag_sq_ccs(image):
         ret[:ys//2,xs//2]=0
         
     return ret
-   
-   
-
-    
-    
-    
-"""
-        i=get_peak_pos(X,Y0)
-        j=get_peak_pos(X,Y1)
-        import matplotlib.pyplot as plt
-        plt.figure()
-        plt.plot(X,Y0,'x',label='data')
-        plt.plot([i,i],[1,Y0.max()],label='logfit')
-        plt.plot([-5,5],[.1*Y0[5],.1*Y0[5]])
-        plt.figure()
-        plt.plot(X,Y1,'x',label='data')
-        plt.plot([j,j],[1,Y1.max()],label='logfit')
-        plt.plot([-5,5],[.1*Y1[5],.1*Y1[5]])
-"""
