@@ -10,8 +10,10 @@ The scale difference should be reasonable (2x)
     
 If you crop the images to reasonable size, the algorithm is much faster:
 eg:
-512x512   : 0.06s
-1024x1024 : 0.42s
+511x511   : 0.058s
+512x512   : 0.058s
+513x513   : 0.066s /!\ 15% increase!
+1024x1024 : 0.34s
 4096x4096 : 9s
 
 TODO:
@@ -418,10 +420,12 @@ def center_of_mass(X,Y):
     
     
 def get_peak_pos(data,wrap=False):
-    """Get the peak position
-
-    The data is assumed to wrap    
+    """Get the peak position with subpixel precision
+    
+    If the data should be wrapped, set wrap to true
     """ 
+    #remove mean
+    data=data-data.mean()
     #get maximum value
     argmax=data.argmax()
     dsize=data.size
@@ -432,7 +436,7 @@ def get_peak_pos(data,wrap=False):
     peak=data>cut
     peak,__=label(peak)
     #wrap border
-    if peak[0]!=0 and peak[-1]!=0 and peak[0]!=peak[-1]:
+    if wrap and peak[0]!=0 and peak[-1]!=0 and peak[0]!=peak[-1]:
         peak[peak==peak[-1]]=peak[0]
     #extract peak
     peak=peak==peak[argmax]
@@ -440,6 +444,7 @@ def get_peak_pos(data,wrap=False):
     #get values along X and Y
     X=np.arange(dsize)[peak]
     Y=data[peak]
+     #wrap border
     if wrap:
         #wrap X values d
         X[X>dsize//2]-=dsize

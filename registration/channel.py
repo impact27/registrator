@@ -5,7 +5,6 @@ Created on Wed May 18 16:53:44 2016
 @author: quentinpeter
 """
 from numpy.fft import irfft
-from scipy.ndimage.interpolation import map_coordinates
 from scipy.ndimage.filters import gaussian_filter
 import math
 import numpy as np
@@ -76,8 +75,11 @@ def channel_width(im,chanangle=None,isccsedge=False):
     plt.plot([0,500],[f.mean()+3*f.std(),f.mean()+3*f.std()])
     #"""
     
-    #find max excluding the first few points
-    return (wmin+f[wmin:f.size//2].argmax()), chanangle
+     #find max excluding the first few points
+    ret=reg.get_peak_pos(f[wmin:f.size//2])
+    
+    #return max and corresponding angle
+    return (wmin+ret), chanangle
     
 def channel_angle(im,isshiftdftedge=False):
     """Extract the channel angle from the rfft"""
@@ -93,8 +95,11 @@ def channel_angle(im,isshiftdftedge=False):
     plt.figure()
     plt.plot(np.log(lp).sum(-1),'x')
     #"""
+    
+    #get peak pos
+    ret=reg.get_peak_pos(lp.sum(-1),wrap=True)
     #return max-pi/2
-    return reg.clamp_angle(lp.sum(-1).argmax()*anglestep-np.pi/2)
+    return reg.clamp_angle(ret*anglestep-np.pi/2)
     
 def edge(im):
     """Extract the edges of an image
@@ -140,6 +145,8 @@ def register_channel(im0,im1,scale=None,ch0angle=None):
     return angle, scale, [y, x], e2
     
 def uint8sc(im):
+    """Scale the image to uint8
+    """
     immin=im.min()
     immax=im.max()
     imrange=immax-immin
