@@ -7,7 +7,6 @@ Created on Tue May 31 15:20:35 2016
 from matplotlib.pyplot import figure, plot, imshow, show,close,semilogy, hold
 import matplotlib.image as mpimg
 import numpy as np
-import math
 import importlib
 #Load local libraries
 import registration.image as ir
@@ -20,7 +19,7 @@ def plotreg(im0,im2,origin):
     imshow(cr.edge(im2),extent=ir.get_extent(origin, im2.shape),alpha=0.5)
     show()
 #%% test with actual image
-photo=mpimg.imread('IMG.jpg')
+photo=mpimg.imread('test_DATA/IMG.jpg')
 photo=photo.sum(-1)
 #%%
 importlib.reload(ir)

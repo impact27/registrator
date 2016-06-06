@@ -3,6 +3,8 @@
 Created on Thu Jun  2 17:35:18 2016
 
 @author: quentinpeter
+
+Compute the formula for gauss log fit
 """
 #Gauss = exp (C0-1/(2*C2)*(x-C1)**2)
 #Variance=C2

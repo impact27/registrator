@@ -3,13 +3,15 @@
 Created on Thu May 19 11:32:34 2016
 
 @author: quentinpeter
+
+profile register_channel
 """
 
 import matplotlib.image as mpimg
 import registration.channel as cr
 
-fns=['20160513/25.tif']
-fns.append('20160513/10_1.tif')
+fns=['test_DATA/20160513/25.tif']
+fns.append('test_DATA/20160513/10_1.tif')
 
 imgs=[mpimg.imread(fn) for fn in fns]
 

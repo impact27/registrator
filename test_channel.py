@@ -25,11 +25,11 @@ importlib.reload(cr)
 #%matplotlib osx
 
 #%% nload images
-fns=['20160513/25.tif']
-fns.append('20160513/10_1.tif')
-fns.append('20160513/10_2.tif')
-fns.append('20160513/10_3.tif')
-fns.append('channel_opening.png')
+fns=['test_DATA/20160513/25.tif']
+fns.append('test_DATA/20160513/10_1.tif')
+fns.append('test_DATA/20160513/10_2.tif')
+fns.append('test_DATA/20160513/10_3.tif')
+fns.append('test_DATA/channel_opening.png')
 imgs=[mpimg.imread(fn) for fn in fns]
 
 #%%
