@@ -23,11 +23,11 @@ photo=mpimg.imread('test_DATA/IMG.jpg')
 photo=photo.sum(-1)
 #%%
 importlib.reload(ir)
-part=ir.rotate_scale(np.float32(photo),np.pi/3,1.2)
+part=ir.rotate_scale(photo,np.pi/3,1.2)
 #%%
 importlib.reload(ir)
-angle, scale, origin, im2=ir.register_images(np.float32(photo),
-                                             np.float32(part))
+angle, scale, origin, im2=ir.register_images(photo,
+                                             part)
 #%%
 #"""
 figure(2)

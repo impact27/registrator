@@ -28,6 +28,10 @@ B. Srinivasa Reddy and B. N. Chatterji
 
 Works with Python 3.5
 
+The input is casted to float32. If you need more precision, you can always 
+use these functions to detect the rotation and then rotate yourself with scipy
+(slower but keep the precision)
+
 """
 #import libraries
 import numpy as np
@@ -49,6 +53,9 @@ def register_images(im0,im1):
     The best case would be to have two squares images of the same size.
     The algorithm is faster if the size is a power of 2.
     """
+    #sanitize input
+    im0=np.asarray(im0,dtype=np.float32)
+    im1=np.asarray(im1,dtype=np.float32)
     #Compute DFT (THe images are resized to the same size)
     f0, f1=dft_optsize_same(im0,im1)
     #Get rotation and scale
@@ -68,6 +75,10 @@ def find_rotation_scale(im0,im1,isccs=False):
     If the images are already DFT and in the CCS format, set isccs to True.
     Otherwise the function does it for you
     """
+    #sanitize input
+    im0=np.asarray(im0,dtype=np.float32)
+    im1=np.asarray(im1,dtype=np.float32)
+    
     #if ccs, convert to shifted dft before giving to polar_fft
     if isccs:    
         im0=centered_mag_sq_ccs(im0)
@@ -101,6 +112,11 @@ def find_shift_dft(im0,im1, isccs=False, subpix=True):
     If the image are expected to match at several places (channels), 
     use blurres
     """
+    #sanitize input
+    im0=np.asarray(im0,dtype=np.float32)
+    im1=np.asarray(im1,dtype=np.float32)
+    
+    #check input
     if not isccs:
         im0,im1=dft_optsize_same(im0,im1)
     else:
@@ -153,7 +169,9 @@ def find_shift_cc(im0,im1,ylim=None,xlim=None):
     
     No subpixel precision
     """
-    
+    #sanitize input
+    im0=np.asarray(im0,dtype=np.float32)
+    im1=np.asarray(im1,dtype=np.float32)
     #Remove mean
     im0=im0-im0.mean()
     im1=im1-im1.mean()
@@ -176,7 +194,7 @@ def find_shift_cc(im0,im1,ylim=None,xlim=None):
     #pad image
     im0, offset = pad_img(im0,pad)
     #compute Cross correlation matrix
-    xc=cv2.matchTemplate(np.float32(im0),np.float32(im1),cv2.TM_CCORR)
+    xc=cv2.matchTemplate(im0,im1,cv2.TM_CCORR)
     #Find maximum of abs (can be anticorrelated)
     idx=np.asarray(np.unravel_index(np.argmax(xc),xc.shape))        
     #Return origin in im0 units
@@ -188,7 +206,14 @@ def find_shift_cc(im0,im1,ylim=None,xlim=None):
 #Medium level functions#
 ########################
 
-
+def orientation_angle(im, isshiftdft=False):
+    """Give the highest contribution to the orientation"""
+    #compute log fft
+    lp, anglestep=polar_fft(im,isshiftdft=isshiftdft)  
+    #get peak pos
+    ret=get_peak_pos(lp.sum(-1),wrap=True)
+    #return max-pi/2
+    return clamp_angle(ret*anglestep-np.pi/2)
 
 def dft_optsize(im, shape=None):
     """Resize image for optimal DFT and computes it"""
@@ -223,16 +248,30 @@ def dft_optsize_same(im0,im1):
     f1=dft_optsize(im1,shape=shape)
     return f0,f1
     
-def rotate_scale(im,angle,scale):
+def rotate_scale(im,angle,scale, borderValue=0):
     """Rotates and scales the image"""
+    im=np.asarray(im,dtype=np.float32)
     rows,cols = im.shape
     M = cv2.getRotationMatrix2D((cols/2,rows/2),-angle*180/np.pi,1/scale)
     im = cv2.warpAffine(im,M,(cols,rows),
                         borderMode=cv2.BORDER_CONSTANT,
-                        flags=cv2.INTER_CUBIC)#REPLICATE
+                        flags=cv2.INTER_CUBIC,
+                        borderValue=borderValue)#REPLICATE
     return im
     
-
+def shift_image(im, shift, borderValue=0):
+    """shift the image
+    """
+    im=np.asarray(im,dtype=np.float32)
+    rows,cols = im.shape
+    M = np.asarray([[1,0,shift[1]],[0,1,shift[0]]],dtype=np.float32)
+    return cv2.warpAffine(im,M,(cols,rows),
+                        borderMode=cv2.BORDER_CONSTANT,
+                        flags=cv2.INTER_CUBIC,
+                        borderValue=borderValue)
+    
+    
+    
 def polar_fft(image, isshiftdft=False, anglestep=None, radiimax=None,
               islogr=False):
     """Return dft in polar (or log-polar) units, the angle step 
@@ -250,7 +289,7 @@ def polar_fft(image, isshiftdft=False, anglestep=None, radiimax=None,
     log_base is the base of the log. It is deduced from radiimax.
     Two images that will be compared should therefore have the same radiimax.
     """
-    image=np.float32(image)
+    image=np.asarray(image, dtype=np.float32)
     #get dft if not already done
     if not isshiftdft:
         image=centered_mag_sq_ccs(dft_optsize(image))
@@ -452,6 +491,10 @@ def get_peak_pos(data,wrap=False):
     #remove argmax as in X**4 X should be small
     offset=X[Y==Y.max()][0]
     X-=offset
+    
+    #We want to fit in a radius of 3 around the center
+    Y=Y[abs(X)<3]
+    X=X[abs(X)<3]
     
     #if>2, use fit_log
     if peak.sum() > 2:

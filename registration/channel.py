@@ -86,20 +86,7 @@ def channel_angle(im,isshiftdftedge=False):
     #Compute edge
     if not isshiftdftedge:
         im=edge(im)
-    #compute log fft
-    lp, anglestep=reg.polar_fft(im,isshiftdft=isshiftdftedge)  
-    """
-    import matplotlib.pyplot as plt
-    plt.figure()
-    plt.plot(lp.sum(-1),'x')
-    plt.figure()
-    plt.plot(np.log(lp).sum(-1),'x')
-    #"""
-    
-    #get peak pos
-    ret=reg.get_peak_pos(lp.sum(-1),wrap=True)
-    #return max-pi/2
-    return reg.clamp_angle(ret*anglestep-np.pi/2)
+    return reg.orientation_angle(im,isshiftdft=isshiftdftedge)
     
 def edge(im):
     """Extract the edges of an image

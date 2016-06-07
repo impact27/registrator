@@ -1,6 +1,4 @@
 # -*- coding: utf-8 -*-
-import sys
-sys.path.append('chreg')
 from matplotlib.pyplot import figure, plot, imshow, show,close,semilogy, hold
 import matplotlib.image as mpimg
 import numpy as np
@@ -19,8 +17,6 @@ imgs=[mpimg.imread(fn) for fn in fns]
 #%%
 im0=imgs[2]#[:512,:512]
 im1=ir.rotate_scale(im0-im0.mean(),np.pi/3,1.6)
-im0=np.float32(im0)
-im1=np.float32(im1)
 #%%
 importlib.reload(ir)
 
@@ -56,6 +52,5 @@ figure(3)
 semilogy(lp0.mean(0))
 semilogy(lp1.mean(0))
 figure(4)
-a=lp1.mean(1)
-semilogy(np.r_[a[1283:],a[:1283]])
+semilogy(lp1.mean(1))
 semilogy(lp0.mean(1))

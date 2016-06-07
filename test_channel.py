@@ -44,7 +44,7 @@ def plotreg(im0,im2,origin):
 #Choose image
 im0=imgs[1]
 #get width and angle
-width0,an0=cr.channel_width(np.float32(im0))
+width0,an0=cr.channel_width(im0)
 #plot figure
 figure()
 imshow(im0)
@@ -79,17 +79,21 @@ angle, scale, origin, im2=cr.register_channel(im0,im1)
 figure(3)
 plotreg(im0,im2,origin)
 
-#%%
-angle, scale, origin, im2=ir.register_images(np.float32(cr.edge(im0)),
-                                             np.float32(cr.edge(im1)))
+#%% Idem with image registration
+angle, scale, origin, im2=ir.register_images(cr.edge(im0),
+                                             cr.edge(im1))
 figure(4)
 plotreg(im0,im2,origin)
 #%% detect scale, rotation and offset
 im0=imgs[0]
 im1=imgs[1]
-#%%
 angle, scale, origin, im2=cr.register_channel(im0,im1)
 figure(5)
+plotreg(im0,im2,origin)
+#%% Shows the limits of image registration
+angle, scale, origin, im2=ir.register_images(cr.edge(im0),
+                                             cr.edge(im1))
+figure(6)
 plotreg(im0,im2,origin)
 
 #%% Match to image
@@ -100,5 +104,5 @@ im0=imgs[4][:,:,1]
 
 angle, scale, origin, im2=cr.register_channel(im0,im1)
 
-figure(6)
+figure(7)
 plotreg(im0,im2,origin)
