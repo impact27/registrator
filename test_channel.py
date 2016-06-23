@@ -47,7 +47,7 @@ im0=imgs[1]
 width0,an0=cr.channel_width(im0)
 print(width0)
 #this is cheating but the wrong direction is detected
-width0,an0=cr.channel_width(im0,chanangle=an0+np.pi/2)
+width0,an0=cr.channel_width(im0,chanangle=an0-np.pi/2)
 print(width0)
 #plot figure
 figure()

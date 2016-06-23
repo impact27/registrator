@@ -213,6 +213,7 @@ def find_shift_cc(im0,im1,ylim=None,xlim=None):
 
 def orientation_angle(im, isshiftdft=False):
     """Give the highest contribution to the orientation"""
+    im=np.asarray(im)
     #compute log fft
     lp, anglestep=polar_fft(im,isshiftdft=isshiftdft, logoutput=False)  
     #get peak pos
@@ -222,8 +223,6 @@ def orientation_angle(im, isshiftdft=False):
     import matplotlib.pyplot as plt
     plt.figure()
     plt.plot(lp.sum(-1))
-    plt.figure()
-    plt.imshow(im)
     #"""
     
     #return max (not -pi/2 as 0 is along y and we want 0 alonx x.)
@@ -232,6 +231,8 @@ def orientation_angle(im, isshiftdft=False):
 
 def dft_optsize(im, shape=None):
     """Resize image for optimal DFT and computes it"""
+    #substract mean to avoid having large central value
+    im=im-im.mean()
     #save shape
     initshape=im.shape
     #get optimal size
