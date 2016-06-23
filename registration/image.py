@@ -84,13 +84,15 @@ def find_rotation_scale(im0,im1,isccs=False):
         im0=centered_mag_sq_ccs(im0)
         im1=centered_mag_sq_ccs(im1)
     #Get log polar coordinates. choose the log base 
-    lp1, anglestep, log_base=polar_fft(im1, islogr=True, isshiftdft=isccs)
+    lp1, anglestep, log_base=polar_fft(im1, islogr=True, isshiftdft=isccs,
+                                            logoutput = True)
     lp0, anglestep, log_base=polar_fft(im0, islogr=True, isshiftdft=isccs,
+                                            logoutput = True,
                                             radiimax=lp1.shape[1], 
                                             anglestep=anglestep)
     #Find the shift with log of the log-polar images,
     #to compensate for dft intensity repartition
-    angle, scale = find_shift_dft(cv2.log(lp0),cv2.log(lp1))
+    angle, scale = find_shift_dft(lp0,lp1)
     #get angle in correct units
     angle*=anglestep
     #get scale in linear units
@@ -143,11 +145,14 @@ def find_shift_dft(im0,im1, isccs=False, subpix=True):
     #find max
     idx=np.asarray(np.unravel_index(np.argmax(xc),shape)) 
     
-    """   
+    """
+    from matplotlib import pyplot as plt
     plt.figure()
     from numpy.fft import fftshift
     plt.imshow(fftshift(xc))
     print(idx)
+    plt.figure()
+    plt.plot(xc[:,0])
     #"""
      
     if subpix:
@@ -209,11 +214,21 @@ def find_shift_cc(im0,im1,ylim=None,xlim=None):
 def orientation_angle(im, isshiftdft=False):
     """Give the highest contribution to the orientation"""
     #compute log fft
-    lp, anglestep=polar_fft(im,isshiftdft=isshiftdft)  
+    lp, anglestep=polar_fft(im,isshiftdft=isshiftdft, logoutput=False)  
     #get peak pos
     ret=get_peak_pos(lp.sum(-1),wrap=True)
-    #return max-pi/2
-    return clamp_angle(ret*anglestep-np.pi/2)
+    
+    """
+    import matplotlib.pyplot as plt
+    plt.figure()
+    plt.plot(lp.sum(-1))
+    plt.figure()
+    plt.imshow(im)
+    #"""
+    
+    #return max (not -pi/2 as 0 is along y and we want 0 alonx x.)
+    #the transformation is basically "For Free"
+    return clamp_angle(ret*anglestep)
 
 def dft_optsize(im, shape=None):
     """Resize image for optimal DFT and computes it"""
@@ -272,8 +287,8 @@ def shift_image(im, shift, borderValue=0):
     
     
     
-def polar_fft(image, isshiftdft=False, anglestep=None, radiimax=None,
-              islogr=False):
+def polar_fft(image, anglestep=None, radiimax=None, *, isshiftdft=False,
+              islogr=False, logoutput=False):
     """Return dft in polar (or log-polar) units, the angle step 
     (and the log base)
     
@@ -334,6 +349,10 @@ def polar_fft(image, isshiftdft=False, anglestep=None, radiimax=None,
     
     #get output
     output=cv2.remap(image,x,y,cv2.INTER_LINEAR)#LINEAR, CUBIC,LANCZOS4
+    #apply log
+    if logoutput:
+        output=cv2.log(output)
+    
     if islogr:
         return output, anglestep, log_base
     else:
@@ -463,6 +482,8 @@ def get_peak_pos(data,wrap=False):
     
     If the data should be wrapped, set wrap to true
     """ 
+    #remove invalid values (assuming data>0)
+    data[np.logical_not(np.isfinite(data))] = 0
     #remove mean
     data=data-data.mean()
     #get maximum value
