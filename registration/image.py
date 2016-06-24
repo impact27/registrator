@@ -211,13 +211,27 @@ def find_shift_cc(im0,im1,ylim=None,xlim=None):
 #Medium level functions#
 ########################
 
-def orientation_angle(im, isshiftdft=False):
-    """Give the highest contribution to the orientation"""
+def orientation_angle(im, approxangle=None,* ,isshiftdft=False):
+    """Give the highest contribution to the orientation
+    if approxangle is specified, search only within +- pi/4    
+    """
     im=np.asarray(im)
     #compute log fft
     lp, anglestep=polar_fft(im,isshiftdft=isshiftdft, logoutput=False)  
+    #get distribution
+    adis=lp.sum(-1)
+    if approxangle is not None:
+        #-np.pi/2 as we are in fft
+        amin=clamp_angle(approxangle-np.pi/4-np.pi/2)
+        amax=clamp_angle(approxangle+np.pi/4-np.pi/2)
+        angles=np.r_[-np.pi/2:np.pi/2:anglestep]
+        if amin>amax:
+            adis[np.logical_and(angles > amax, angles < amin)]=adis.min()
+        else:
+            adis[np.logical_or(angles > amax, angles < amin)]=adis.min()
+            
     #get peak pos
-    ret=get_peak_pos(lp.sum(-1),wrap=True)
+    ret=get_peak_pos(adis,wrap=True)
     
     """
     import matplotlib.pyplot as plt

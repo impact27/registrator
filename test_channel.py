@@ -44,11 +44,7 @@ def plotreg(im0,im2,origin):
 #Choose image
 im0=imgs[1]
 #get width and angle
-width0,an0=cr.channel_width(im0)
-print(width0)
-#this is cheating but the wrong direction is detected
-width0,an0=cr.channel_width(im0,chanangle=an0-np.pi/2)
-print(width0)
+width0,an0=cr.channel_width(im0, chanapproxangle=-np.pi/2)
 #plot figure
 figure()
 imshow(im0)
@@ -79,7 +75,7 @@ plotreg(im0,im1,origin)
 #%% test rotation and offset
 im0=imgs[1]
 im1=imgs[2]
-angle, scale, origin, im2=cr.register_channel(im0,im1)
+angle, scale, origin, im2=cr.register_channel(im0,im1, chanapproxangle=-np.pi/2)
 figure(3)
 plotreg(im0,im2,origin)
 
@@ -91,7 +87,7 @@ plotreg(im0,im2,origin)
 #%% detect scale, rotation and offset
 im0=imgs[0]
 im1=imgs[1]
-angle, scale, origin, im2=cr.register_channel(im0,im1)
+angle, scale, origin, im2=cr.register_channel(im0,im1, chanapproxangle=-np.pi/2)
 figure(5)
 plotreg(im0,im2,origin)
 #%% Shows the limits of image registration
@@ -106,7 +102,7 @@ importlib.reload(ir)
 im1=imgs[3]
 im0=imgs[4][:,:,1]
 
-angle, scale, origin, im2=cr.register_channel(im0,im1)
+angle, scale, origin, im2=cr.register_channel(im0,im1, chanapproxangle=-np.pi/2)
 
 figure(7)
 plotreg(im0,im2,origin)

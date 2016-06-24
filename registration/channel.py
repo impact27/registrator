@@ -11,7 +11,7 @@ import numpy as np
 from . import image as reg
 import cv2
 
-def channel_width(im,chanangle=None,isccsedge=False):
+def channel_width(im, chanangle=None, *, chanapproxangle=None,isccsedge=False):
     """Get an estimation of the channel width. 
 
     This function assumes two parallel lines along angle chanangle.
@@ -38,7 +38,7 @@ def channel_width(im,chanangle=None,isccsedge=False):
     
     #if the channel direction is not given, deduce it from channel_angle
     if chanangle is None:
-        chanangle = channel_angle(im,isshiftdftedge=True) 
+        chanangle = channel_angle(im,isshiftdftedge=True,chanapproxangle=chanapproxangle)
     
     #get vector perpendicular to angle
     fdir=np.asarray([math.cos(chanangle),-math.sin(chanangle)])#y,x = 0,1
@@ -81,12 +81,13 @@ def channel_width(im,chanangle=None,isccsedge=False):
     #return max and corresponding angle
     return (wmin+ret), chanangle
     
-def channel_angle(im,isshiftdftedge=False):
+def channel_angle(im,chanapproxangle=None, *, isshiftdftedge=False):
     """Extract the channel angle from the rfft"""
     #Compute edge
     if not isshiftdftedge:
         im=edge(im)
-    return reg.orientation_angle(im,isshiftdft=isshiftdftedge)
+    return reg.orientation_angle(im,isshiftdft=isshiftdftedge,
+                                 approxangle=chanapproxangle)
     
 def edge(im):
     """Extract the edges of an image
@@ -97,7 +98,7 @@ def edge(im):
     e0=cv2.Canny(uint8sc(im),100,200)
     return e0
     
-def register_channel(im0,im1,scale=None,ch0angle=None):
+def register_channel(im0,im1,scale=None,ch0angle=None, chanapproxangle=None):
     """Register the images assuming they are channels
     
     If the scale difference is known pass it in scale 
@@ -110,8 +111,8 @@ def register_channel(im0,im1,scale=None,ch0angle=None):
     fe0, fe1=reg.dft_optsize_same(np.float32(e0),np.float32(e1))
     
     #compute the angle and channel width of biggest angular feature
-    w0,a0=channel_width(fe0,isccsedge=True)
-    w1,a1=channel_width(fe1,isccsedge=True)
+    w0,a0=channel_width(fe0,isccsedge=True, chanapproxangle=chanapproxangle)
+    w1,a1=channel_width(fe1,isccsedge=True, chanapproxangle=chanapproxangle)
     
     #get angle diff
     angle=reg.clamp_angle(a0-a1)
