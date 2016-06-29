@@ -221,7 +221,7 @@ def orientation_angle(im, approxangle=None,* ,isshiftdft=False):
     #get distribution
     adis=lp.sum(-1)
     if approxangle is not None:
-        #-np.pi/2 as we are in fft
+        #-np.pi/2 as we are in fft. +- pi/4 is search window
         amin=clamp_angle(approxangle-np.pi/4-np.pi/2)
         amax=clamp_angle(approxangle+np.pi/4-np.pi/2)
         angles=np.r_[-np.pi/2:np.pi/2:anglestep]

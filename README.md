@@ -26,6 +26,13 @@ This project will automatically detect these differences.
 
 ## Installation
 
+After downloading, you can copy the image_registration folder in /usr/local/lib/python3.5/site-packages/
+
+Or you can create a symbolic link:
+
+ln -s $(pwd)/image_registration/ /usr/local/lib/python3.5/site-packages/
+
+
 This project require python3, openCV 3 and the python openCV interface
 
 On a mac with HomeBrew:
