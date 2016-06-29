@@ -2,8 +2,8 @@
 from matplotlib.pyplot import figure, plot, imshow, show,close,semilogy, hold
 import matplotlib.image as mpimg
 import numpy as np
-import registration.image as ir
-import registration.channel as cr
+import image_registration.image as ir
+import image_registration.channel as cr
 import importlib
 
 #%% nload images
@@ -23,7 +23,7 @@ importlib.reload(ir)
 figure(0)
 imshow(im0)
 figure(1)
-imshow(im1)
+imshow(im1) 
 
 #%%
 

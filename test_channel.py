@@ -14,8 +14,8 @@ import numpy as np
 import math
 import importlib
 #Load local libraries
-import registration.image as ir
-import registration.channel as cr
+import image_registration.image as ir
+import image_registration.channel as cr
 
 #%%Reload them in case they changed
 importlib.reload(ir)

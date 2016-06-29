@@ -9,8 +9,8 @@ import matplotlib.image as mpimg
 import numpy as np
 import importlib
 #Load local libraries
-import registration.image as ir
-import registration.channel as cr
+import image_registration.image as ir
+import image_registration.channel as cr
 #%%
 #defines an useful plot
 def plotreg(im0,im2,origin):

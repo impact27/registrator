@@ -45,7 +45,7 @@ from scipy.ndimage.measurements import label
 ######################
 
 
-def register_images(im0,im1):
+def register_images(im0,im1,*,rmMean=True):
     """Finds the rotation, scaling and translation of im1 relative to im0
     
     The algorithm uses gaussian fit for subpixel precision.
@@ -56,6 +56,10 @@ def register_images(im0,im1):
     #sanitize input
     im0=np.asarray(im0,dtype=np.float32)
     im1=np.asarray(im1,dtype=np.float32)
+    if rmMean:
+        #remove mean
+        im0-=im0.mean()
+        im1-=im1.mean()
     #Compute DFT (THe images are resized to the same size)
     f0, f1=dft_optsize_same(im0,im1)
     #Get rotation and scale
@@ -245,8 +249,6 @@ def orientation_angle(im, approxangle=None,* ,isshiftdft=False):
 
 def dft_optsize(im, shape=None):
     """Resize image for optimal DFT and computes it"""
-    #substract mean to avoid having large central value
-    im=im-im.mean()
     #save shape
     initshape=im.shape
     #get optimal size
@@ -322,6 +324,8 @@ def polar_fft(image, anglestep=None, radiimax=None, *, isshiftdft=False,
     image=np.asarray(image, dtype=np.float32)
     #get dft if not already done
     if not isshiftdft:
+        #substract mean to avoid having large central value
+        image=image-image.mean()
         image=centered_mag_sq_ccs(dft_optsize(image))
     
     #the center is shifted from 0,0 to the ~ center 
