@@ -88,6 +88,18 @@ def channel_angle(im,chanapproxangle=None, *, isshiftdftedge=False):
         im=edge(im)
     return reg.orientation_angle(im,isshiftdft=isshiftdftedge,
                                  approxangle=chanapproxangle)
+def half_channel_angle(im, cut = 'top'):
+    """The image side cuts the channel alongs it
+    """
+    rotnbr={'top':  0,
+           'right':  1,
+           'bottom':2,
+           'left': 3}
+    k=rotnbr[cut]
+    im=np.rot90(im,k)
+    ed=edge(np.concatenate((im[::-1,::-1],im)))
+    ed[im.shape[0]-2:im.shape[0]+2,:]=0
+    return reg.clamp_angle(reg.orientation_angle(ed)-k*np.pi/2)
     
 def edge(im):
     """Extract the edges of an image
