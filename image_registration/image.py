@@ -220,8 +220,9 @@ def orientation_angle(im, approxangle=None,* ,isshiftdft=False):
     if approxangle is specified, search only within +- pi/4    
     """
     im=np.asarray(im)
-    #compute log fft
-    lp, anglestep=polar_fft(im,isshiftdft=isshiftdft, logoutput=False)  
+    #compute log fft (nearest interpolation as line go between pixels)
+    lp, anglestep=polar_fft(im,isshiftdft=isshiftdft,
+                            logoutput=False, interpolation='nearest')  
     #get distribution
     adis=lp.sum(-1)
     if approxangle is not None:
@@ -305,7 +306,7 @@ def shift_image(im, shift, borderValue=0):
     
     
 def polar_fft(image, anglestep=None, radiimax=None, *, isshiftdft=False,
-              islogr=False, logoutput=False):
+              islogr=False, logoutput=False, interpolation='bilinear'):
     """Return dft in polar (or log-polar) units, the angle step 
     (and the log base)
     
@@ -365,9 +366,13 @@ def polar_fft(image, anglestep=None, radiimax=None, *, isshiftdft=False,
                flags=cv2.GEMM_2_T)+center[0]
     x=cv2.gemm(np.cos(theta),radius,qshape[1],0,0,
                flags=cv2.GEMM_2_T)+center[1]
-    
+    interp=cv2.INTER_LINEAR
+    if interpolation == 'bicubic':
+        interp=cv2.INTER_CUBIC
+    if interpolation == 'nearest':
+        interp=cv2.INTER_NEAREST
     #get output
-    output=cv2.remap(image,x,y,cv2.INTER_LINEAR)#LINEAR, CUBIC,LANCZOS4
+    output=cv2.remap(image,x,y, interp)#LINEAR, CUBIC,LANCZOS4
     #apply log
     if logoutput:
         output=cv2.log(output)

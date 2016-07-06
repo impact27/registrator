@@ -38,7 +38,8 @@ def channel_width(im, chanangle=None, *, chanapproxangle=None,isccsedge=False):
     
     #if the channel direction is not given, deduce it from channel_angle
     if chanangle is None:
-        chanangle = channel_angle(im,isshiftdftedge=True,chanapproxangle=chanapproxangle)
+        chanangle = channel_angle(im,isshiftdftedge=True,
+                                  chanapproxangle=chanapproxangle)
     
     #get vector perpendicular to angle
     fdir=np.asarray([math.cos(chanangle),-math.sin(chanangle)])#y,x = 0,1
@@ -88,18 +89,16 @@ def channel_angle(im,chanapproxangle=None, *, isshiftdftedge=False):
         im=edge(im)
     return reg.orientation_angle(im,isshiftdft=isshiftdftedge,
                                  approxangle=chanapproxangle)
-def half_channel_angle(im, cut = 'top'):
-    """The image side cuts the channel alongs it
+    
+def Scharr_edge(im, blurRadius=21):
+    """Extract the edges using Scharr kernel (Sobel optimized for rotation
+    invariance)
     """
-    rotnbr={'top':  0,
-           'right':  1,
-           'bottom':2,
-           'left': 3}
-    k=rotnbr[cut]
-    im=np.rot90(im,k)
-    ed=edge(np.concatenate((im[::-1,::-1],im)))
-    ed[im.shape[0]-2:im.shape[0]+2,:]=0
-    return reg.clamp_angle(reg.orientation_angle(ed)-k*np.pi/2)
+    im=np.asarray(im,dtype='float32')
+    im=cv2.GaussianBlur(im,(blurRadius,blurRadius),0)
+    Gx=cv2.Scharr(im,-1,0,1)
+    Gy=cv2.Scharr(im,-1,1,0)
+    return cv2.magnitude(Gx,Gy)
     
 def edge(im):
     """Extract the edges of an image

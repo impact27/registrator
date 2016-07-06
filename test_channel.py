@@ -52,8 +52,8 @@ imshow(im0)
 center=np.array(im0.shape)//2
 chdir=[math.sin(an0),
        math.cos(an0)]
-x=(np.array([0,chdir[1]])+1)*center[1]
-y=(np.array([0,chdir[0]])+1)*center[0]
+x=(np.array([0,chdir[1]]))*center[0]+center[1]
+y=(np.array([0,chdir[0]]))*center[0]+center[0]
 plot(x,y)
 #add width
 x=np.array([0, chdir[0]])*width0+center[1]
