@@ -58,8 +58,8 @@ def register_images(im0,im1,*,rmMean=True):
     im1=np.asarray(im1,dtype=np.float32)
     if rmMean:
         #remove mean
-        im0-=im0.mean()
-        im1-=im1.mean()
+        im0= im0 - im0.mean()
+        im1= im1 - im1.mean()
     #Compute DFT (THe images are resized to the same size)
     f0, f1=dft_optsize_same(im0,im1)
     #Get rotation and scale
@@ -82,18 +82,22 @@ def find_rotation_scale(im0,im1,isccs=False):
     #sanitize input
     im0=np.asarray(im0,dtype=np.float32)
     im1=np.asarray(im1,dtype=np.float32)
+    truesize=None
     
     #if ccs, convert to shifted dft before giving to polar_fft
-    if isccs:    
+    if isccs:
+        truesize=im0.shape
         im0=centered_mag_sq_ccs(im0)
         im1=centered_mag_sq_ccs(im1)
     #Get log polar coordinates. choose the log base 
     lp1, anglestep, log_base=polar_fft(im1, islogr=True, isshiftdft=isccs,
-                                            logoutput = True)
+                                            logoutput = True,
+                                            truesize=truesize)
     lp0, anglestep, log_base=polar_fft(im0, islogr=True, isshiftdft=isccs,
                                             logoutput = True,
                                             radiimax=lp1.shape[1], 
-                                            anglestep=anglestep)
+                                            anglestep=anglestep,
+                                            truesize=truesize)
     #Find the shift with log of the log-polar images,
     #to compensate for dft intensity repartition
     angle, scale = find_shift_dft(lp0,lp1)
@@ -116,7 +120,7 @@ def find_shift_dft(im0,im1, isccs=False, subpix=True):
     If subpix is True, a gaussian fit is used for subpix precision
     
     If the image are expected to match at several places (channels), 
-    use blurres
+    use blurres 
     """
     #sanitize input
     im0=np.asarray(im0,dtype=np.float32)
@@ -151,12 +155,19 @@ def find_shift_dft(im0,im1, isccs=False, subpix=True):
     
     """
     from matplotlib import pyplot as plt
-    plt.figure()
     from numpy.fft import fftshift
-    plt.imshow(fftshift(xc))
-    print(idx)
-    plt.figure()
-    plt.plot(xc[:,0])
+    #plt.figure()
+    #
+    #plt.imshow(fftshift(xc))
+    #print(idx)
+    #plt.figure()
+    if toremove:
+        plt.figure(1)
+        l=len(xc[:,0])
+        plt.plot(np.arange(l)/l,xc[:,0])
+        print(l,xc[-1,0])
+        plt.figure(2)
+        plt.imshow(fftshift(xc))
     #"""
      
     if subpix:
@@ -306,7 +317,8 @@ def shift_image(im, shift, borderValue=0):
     
     
 def polar_fft(image, anglestep=None, radiimax=None, *, isshiftdft=False,
-              islogr=False, logoutput=False, interpolation='bilinear'):
+              islogr=False, logoutput=False, interpolation='bilinear',
+              truesize=None):
     """Return dft in polar (or log-polar) units, the angle step 
     (and the log base)
     
@@ -325,9 +337,12 @@ def polar_fft(image, anglestep=None, radiimax=None, *, isshiftdft=False,
     image=np.asarray(image, dtype=np.float32)
     #get dft if not already done
     if not isshiftdft:
+        truesize=image.shape
         #substract mean to avoid having large central value
         image=image-image.mean()
         image=centered_mag_sq_ccs(dft_optsize(image))
+    else:
+        assert(truesize is not None)
     
     #the center is shifted from 0,0 to the ~ center 
     #(eg. if 4x4 image, the center is at [2,2], as if 5x5)
@@ -336,11 +351,15 @@ def polar_fft(image, anglestep=None, radiimax=None, *, isshiftdft=False,
     
     #if the angle Step is not given, take the number of pixel
     #on the perimeter as the target #=range/step
+    nangle=np.min(truesize)
+    
     if anglestep is None:
-        anglestep=np.pi/qshape.min()/2#range is pi, nbangle = 2r =~pi r
+        anglestep=np.pi/nangle#range is pi, nbangle = 2r =~pi r
+    else:
+        nangle=int(np.round(np.pi/anglestep))
     
     #get the theta range
-    theta=np.arange(-np.pi/2,np.pi/2,anglestep,dtype=np.float32)
+    theta=np.linspace(-np.pi/2,np.pi/2,nangle,endpoint=False, dtype=np.float32)
     
     #For the radii, the units are comparable if the log_base and radiimax are
     #the same. Therefore, log_base is deduced from radiimax

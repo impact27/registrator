@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
-from matplotlib.pyplot import figure, plot, imshow, show,close,semilogy, hold
+from matplotlib.pyplot import colorbar, figure, plot, imshow, show,close,semilogy, hold
 import matplotlib.image as mpimg
 import numpy as np
 import image_registration.image as ir
 import image_registration.channel as cr
 import importlib
+import matplotlib.pyplot as plt
 
 #%% nload images
 fns=['test_DATA/UVData/im0.tif']
@@ -34,7 +35,7 @@ t0=im0>im0.mean()
 t1=im1>im1.mean()
 t2=im2>im2.mean()
 print(angle+np.pi/3)
-print(1/scale-1.6)
+print(scale*1.6)
 
 #%%
 figure(2)
@@ -54,3 +55,37 @@ semilogy(lp1.mean(0))
 figure(4)
 semilogy(lp1.mean(1))
 semilogy(lp0.mean(1))
+
+#%%
+ra=0.2*np.pi
+sc=1.2
+
+im0 = imgs[2][200:800,200:800]
+im1 = ir.rotate_scale(imgs[2],ra,sc)[300:,300:]
+
+angle, scale, [y, x], im2=  ir.register_images(im1,im0)  
+print(angle+ra, scale*sc, [y, x])
+
+
+im2=ir.rotate_scale(im0,angle,scale,borderValue=np.nan) 
+
+for i in range(0,im2.shape[0],40):
+    im2[i:i+20,:]=np.nan        
+
+
+figure(7)
+imshow(im1)
+hold(True)
+imshow(im2,extent=ir.get_extent([y, x], im2.shape))
+
+figure(5)
+imshow(im1)
+#plt.imsave("im1.png",im1)
+
+figure(6)
+imshow(im0)
+#plt.imsave("im0.png",im0)
+
+
+
+
