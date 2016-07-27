@@ -156,18 +156,20 @@ def find_shift_dft(im0,im1, isccs=False, subpix=True):
     """
     from matplotlib import pyplot as plt
     from numpy.fft import fftshift
-    #plt.figure()
-    #
+    plt.figure()
+    plt.imshow(fftshift(xc))
+    
+    #"""
     #plt.imshow(fftshift(xc))
     #print(idx)
     #plt.figure()
-    if toremove:
-        plt.figure(1)
-        l=len(xc[:,0])
-        plt.plot(np.arange(l)/l,xc[:,0])
-        print(l,xc[-1,0])
-        plt.figure(2)
-        plt.imshow(fftshift(xc))
+#    if toremove:
+#        plt.figure(1)
+#        l=len(xc[:,0])
+#        plt.plot(np.arange(l)/l,xc[:,0])
+#        print(l,xc[-1,0])
+#        plt.figure(2)
+        
     #"""
      
     if subpix:
@@ -226,14 +228,15 @@ def find_shift_cc(im0,im1,ylim=None,xlim=None):
 #Medium level functions#
 ########################
 
-def orientation_angle(im, approxangle=None,* ,isshiftdft=False):
+def orientation_angle(im, approxangle=None,* ,isshiftdft=False,truesize=None):
     """Give the highest contribution to the orientation
     if approxangle is specified, search only within +- pi/4    
     """
     im=np.asarray(im)
     #compute log fft (nearest interpolation as line go between pixels)
     lp, anglestep=polar_fft(im,isshiftdft=isshiftdft,
-                            logoutput=False, interpolation='nearest')  
+                            logoutput=False, interpolation='nearest',
+                            truesize=truesize)  
     #get distribution
     adis=lp.sum(-1)
     if approxangle is not None:
@@ -341,8 +344,13 @@ def polar_fft(image, anglestep=None, radiimax=None, *, isshiftdft=False,
         #substract mean to avoid having large central value
         image=image-image.mean()
         image=centered_mag_sq_ccs(dft_optsize(image))
-    else:
-        assert(truesize is not None)
+    assert(truesize is not None)
+    #TODO: understand why truesize is so important
+#    elif truesize is None:
+#        print("Warning: True Size not specified")
+#        #This is risky but better than 
+#        truesize=np.asarray(image.shape)
+#        truesize[1]*=2
     
     #the center is shifted from 0,0 to the ~ center 
     #(eg. if 4x4 image, the center is at [2,2], as if 5x5)
@@ -357,7 +365,6 @@ def polar_fft(image, anglestep=None, radiimax=None, *, isshiftdft=False,
         anglestep=np.pi/nangle#range is pi, nbangle = 2r =~pi r
     else:
         nangle=int(np.round(np.pi/anglestep))
-    
     #get the theta range
     theta=np.linspace(-np.pi/2,np.pi/2,nangle,endpoint=False, dtype=np.float32)
     

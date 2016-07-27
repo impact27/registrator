@@ -11,7 +11,8 @@ import numpy as np
 from . import image as reg
 import cv2
 
-def channel_width(im, chanangle=None, *, chanapproxangle=None,isccsedge=False):
+def channel_width(im, chanangle=None, *, chanapproxangle=None,
+                  isccsedge=False):
     """Get an estimation of the channel width. 
 
     This function assumes two parallel lines along angle chanangle.
@@ -29,17 +30,20 @@ def channel_width(im, chanangle=None, *, chanapproxangle=None,isccsedge=False):
     
     If the edge and rfft have already been computed, set isrfftedge to True
     """
+    im=np.asarray(im)
     #Compute the fft if it is not already done
     if not isccsedge:
         im= reg.dft_optsize(np.float32(edge(im)))
-        
+    
+    truesize=im.shape
     #get centered magnitude squared
     im = reg.centered_mag_sq_ccs(im)
     
     #if the channel direction is not given, deduce it from channel_angle
     if chanangle is None:
         chanangle = channel_angle(im,isshiftdftedge=True,
-                                  chanapproxangle=chanapproxangle)
+                                  chanapproxangle=chanapproxangle,
+                                  truesize=truesize)
     
     #get vector perpendicular to angle
     fdir=np.asarray([math.cos(chanangle),-math.sin(chanangle)])#y,x = 0,1
@@ -82,13 +86,15 @@ def channel_width(im, chanangle=None, *, chanapproxangle=None,isccsedge=False):
     #return max and corresponding angle
     return (wmin+ret), chanangle
     
-def channel_angle(im,chanapproxangle=None, *, isshiftdftedge=False):
+def channel_angle(im,chanapproxangle=None, *, isshiftdftedge=False,
+                  truesize=None):
     """Extract the channel angle from the rfft"""
     #Compute edge
     if not isshiftdftedge:
         im=edge(im)
     return reg.orientation_angle(im,isshiftdft=isshiftdftedge,
-                                 approxangle=chanapproxangle)
+                                 approxangle=chanapproxangle,
+                                 truesize=truesize)
     
 def Scharr_edge(im, blurRadius=21):
     """Extract the edges using Scharr kernel (Sobel optimized for rotation
