@@ -4,6 +4,8 @@ Created on Tue May 31 15:20:35 2016
 
 @author: quentinpeter
 
+Test with a random picture
+
 Copyright (C) 2016  Quentin Peter
 
 This program is free software: you can redistribute it and/or modify
