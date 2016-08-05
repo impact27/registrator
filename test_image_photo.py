@@ -3,6 +3,21 @@
 Created on Tue May 31 15:20:35 2016
 
 @author: quentinpeter
+
+Copyright (C) 2016  Quentin Peter
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 from matplotlib.pyplot import figure, plot, imshow, show,close,semilogy, hold
 import matplotlib.image as mpimg
@@ -38,9 +53,9 @@ plotreg(photo,im2, origin)
 importlib.reload(ir)
 im0=photo
 im1=part
-lp0, anglestep, log_base=ir.polar_fft(im0, islogr=True)
-lp1, anglestep, log_base=ir.polar_fft(im1, islogr=True,
-                                      anglestep=anglestep, radiimax=lp0.shape[1])
+lp0, log_base=ir.polar_fft(im0, islogr=True)
+lp1, log_base=ir.polar_fft(im1, islogr=True,
+                           nangle=lp0.shape[1], radiimax=lp0.shape[1])
 lp0=np.log(lp0)
 lp1=np.log(lp1)
 close(0)

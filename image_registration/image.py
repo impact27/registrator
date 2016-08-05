@@ -6,7 +6,7 @@ Created on Tue May 10 17:15:48 2016
 
 This module does image registration. 
     
-The scale difference should be reasonable (2x)
+The scale difference should be reasonable (~2x)
     
 If you crop the images to reasonable size, the algorithm is much faster:
 eg:
@@ -15,10 +15,6 @@ eg:
 513x513   : 0.066s /!\ 15% increase!
 1024x1024 : 0.34s
 4096x4096 : 9s
-
-TODO:
-    -Add np.asarray to every input that should be a numpy array
-    -the input type is not well handeled
     
 based on:
     
@@ -31,6 +27,21 @@ Works with Python 3.5
 The input is casted to float32. If you need more precision, you can always 
 use these functions to detect the rotation and then rotate yourself with scipy
 (slower but keep the precision)
+
+Copyright (C) 2016  Quentin Peter
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 """
 #import libraries
@@ -48,6 +59,21 @@ from scipy.ndimage.measurements import label
 def register_images(im0,im1,*,rmMean=True):
     """Finds the rotation, scaling and translation of im1 relative to im0
     
+    Parameters
+    ----------
+    im0: First image
+    im1: Second image
+    rmMean: Set to true to remove the mean (Default)
+    
+    Returns
+    -------
+    angle: The angle difference
+    scale: The scale difference
+    [y, x]: The offset
+    im2: The rotated and translated second image
+    
+    Notes
+    -----
     The algorithm uses gaussian fit for subpixel precision.
     
     The best case would be to have two squares images of the same size.
@@ -76,8 +102,25 @@ def find_rotation_scale(im0,im1,isccs=False):
     """Compares the images and return the best guess for the rotation angle,
     and scale difference.
     
-    If the images are already DFT and in the CCS format, set isccs to True.
-    Otherwise the function does it for you
+    Parameters
+    ----------
+    im0: 2d array
+        First image
+    im1: 2d array
+        Second image
+    isccs: boolean, default False
+        Set to True if the images are alredy DFT and in CCS representation
+    
+    Returns
+    -------
+    angle: number
+        The angle difference
+    scale: number
+        The scale difference
+    
+    Notes
+    -----
+    Uses find_shift_dft
     """
     #sanitize input
     im0=np.asarray(im0,dtype=np.float32)
@@ -90,19 +133,16 @@ def find_rotation_scale(im0,im1,isccs=False):
         im0=centered_mag_sq_ccs(im0)
         im1=centered_mag_sq_ccs(im1)
     #Get log polar coordinates. choose the log base 
-    lp1, anglestep, log_base=polar_fft(im1, islogr=True, isshiftdft=isccs,
-                                            logoutput = True,
-                                            truesize=truesize)
-    lp0, anglestep, log_base=polar_fft(im0, islogr=True, isshiftdft=isccs,
-                                            logoutput = True,
-                                            radiimax=lp1.shape[1], 
-                                            anglestep=anglestep,
-                                            truesize=truesize)
+    lp1, log_base=polar_fft(im1, logpolar=True, isshiftdft=isccs,
+                            logoutput = True, truesize=truesize)
+    lp0, log_base=polar_fft(im0, logpolar=True, isshiftdft=isccs,
+                            logoutput = True, truesize=truesize,
+                            nangle=lp1.shape[0], radiimax=lp1.shape[1])
     #Find the shift with log of the log-polar images,
     #to compensate for dft intensity repartition
     angle, scale = find_shift_dft(lp0,lp1)
     #get angle in correct units
-    angle*=anglestep
+    angle*=np.pi/lp1.shape[0]
     #get scale in linear units
     scale=log_base ** (scale)
     #return angle and scale
@@ -112,15 +152,30 @@ def find_rotation_scale(im0,im1,isccs=False):
 def find_shift_dft(im0,im1, isccs=False, subpix=True):
     """Find the shift between two images using the DFT method
     
+    Parameters
+    ----------
+    im0: 2d array
+        First image
+    im1: 2d array
+        Second image
+    isccs: Boolean, default false
+        Set to True if the images are alredy DFT and in CCS representation
+    subpix: boolean, default True
+        Set to True (default) if you want subpixel precision
+    
+    Returns
+    -------
+    [y, x]: 2 numbers
+        The offset
+    
+    Notes
+    -----
     This algorithm detect a shift using the global phase difference of the DFTs
     
     If the images are already DFT and in the CCS format, set isccs to true.
     In that case the images should have the same size.  
     
-    If subpix is True, a gaussian fit is used for subpix precision
-    
-    If the image are expected to match at several places (channels), 
-    use blurres 
+    If subpix is True, a gaussian fit is used for subpix precision 
     """
     #sanitize input
     im0=np.asarray(im0,dtype=np.float32)
@@ -185,6 +240,24 @@ def find_shift_dft(im0,im1, isccs=False, subpix=True):
 def find_shift_cc(im0,im1,ylim=None,xlim=None):
     """Finds the best shift between im0 and im1 using cross correlation
     
+    Parameters
+    ----------
+    im0: 2d array
+        First image
+    im1: 2d array
+        Second image
+    ylim: 2 numbers, optional
+        The y limits of the search (if None full range is searched)
+    xlim: 2 numbers, optional
+        Ibidem with x
+    
+    Returns
+    -------
+    [y, x]: 2 numbers
+        The offset
+    
+    Notes
+    -----
     The origin of im1 in the im0 referential is returned
     
     ylim and xlim limit the possible output.
@@ -230,11 +303,30 @@ def find_shift_cc(im0,im1,ylim=None,xlim=None):
 
 def orientation_angle(im, approxangle=None,* ,isshiftdft=False,truesize=None):
     """Give the highest contribution to the orientation
+    
+    Parameters
+    ----------
+    im: 2d array
+        The image
+    approxangle: number, optional
+        The approximate angle (None if unknown)
+    isshiftdft: Boolean, default False
+        True if the image has been processed (DFT, fftshift)
+    truesize: 2 numbers, optional
+        Truesize of the image if isshiftdft is True
+    
+    Returns
+    -------
+    angle: number
+        The orientation of the image
+    
+    Notes
+    -----
     if approxangle is specified, search only within +- pi/4    
     """
     im=np.asarray(im)
     #compute log fft (nearest interpolation as line go between pixels)
-    lp, anglestep=polar_fft(im,isshiftdft=isshiftdft,
+    lp=polar_fft(im,isshiftdft=isshiftdft,
                             logoutput=False, interpolation='nearest',
                             truesize=truesize)  
     #get distribution
@@ -243,7 +335,7 @@ def orientation_angle(im, approxangle=None,* ,isshiftdft=False,truesize=None):
         #-np.pi/2 as we are in fft. +- pi/4 is search window
         amin=clamp_angle(approxangle-np.pi/4-np.pi/2)
         amax=clamp_angle(approxangle+np.pi/4-np.pi/2)
-        angles=np.r_[-np.pi/2:np.pi/2:anglestep]
+        angles=np.linspace(-np.pi/2,np.pi/2,lp.shape[0],endpoint=False) 
         if amin>amax:
             adis[np.logical_and(angles > amax, angles < amin)]=adis.min()
         else:
@@ -251,6 +343,7 @@ def orientation_angle(im, approxangle=None,* ,isshiftdft=False,truesize=None):
             
     #get peak pos
     ret=get_peak_pos(adis,wrap=True)
+    anglestep = np.pi/lp.shape[0]
     
     """
     import matplotlib.pyplot as plt
@@ -263,7 +356,25 @@ def orientation_angle(im, approxangle=None,* ,isshiftdft=False,truesize=None):
     return clamp_angle(ret*anglestep)
 
 def dft_optsize(im, shape=None):
-    """Resize image for optimal DFT and computes it"""
+    """Resize image for optimal DFT and computes it
+    
+    Parameters
+    ----------
+    im: 2d array
+        The image
+    shape: 2 numbers, optional
+        The shape of the output image (None will optimize the shape)
+    
+    Returns
+    -------
+    dft: 2d array
+        The dft in CCS representation
+    
+    Notes
+    -----
+    Th shape shoulb be a product of 2, 3, and 5
+    """
+    im=np.asarray(im)
     #save shape
     initshape=im.shape
     #get optimal size
@@ -281,7 +392,28 @@ def dft_optsize(im, shape=None):
     
     
 def dft_optsize_same(im0,im1):
-    """Resize 2 image same size for optimal DFT and computes it"""
+    """Resize 2 image same size for optimal DFT and computes it
+    
+    Parameters
+    ----------
+    im0: 2d array
+        First image
+    im1: 2d array
+        Second image
+    
+    Returns
+    -------
+    dft0: 2d array
+        The dft of the first image 
+    dft1: 2d array
+        The dft of the second image
+        
+    Notes
+    -----
+    dft0 and dft1 will have the same size
+    """
+    im0=np.asarray(im0)
+    im1=np.asarray(im1)
     #save shape
     shape0=im0.shape
     shape1=im1.shape
@@ -296,7 +428,29 @@ def dft_optsize_same(im0,im1):
     return f0,f1
     
 def rotate_scale(im,angle,scale, borderValue=0):
-    """Rotates and scales the image"""
+    """Rotates and scales the image
+    
+    Parameters
+    ----------
+    im: 2d array
+        The image
+    angle: number
+        The angle, in radians, to rotate
+    scale: positive number
+        The scale factor
+    borderValue: number, default 0
+        The value for the pixels outside the border (default 0)
+    
+    Returns
+    -------
+    im: 2d array
+        the rotated and scaled image
+    
+    Notes
+    -----
+    The output image has the same size as the input. 
+    Therefore the image may be cropped in the process.
+    """
     im=np.asarray(im,dtype=np.float32)
     rows,cols = im.shape
     M = cv2.getRotationMatrix2D((cols/2,rows/2),-angle*180/np.pi,1/scale)
@@ -308,6 +462,25 @@ def rotate_scale(im,angle,scale, borderValue=0):
     
 def shift_image(im, shift, borderValue=0):
     """shift the image
+    
+    Parameters
+    ----------
+    im: 2d array
+        The image
+    shift: 2 numbers
+        (y,x) the shift in y and x direction
+    borderValue: number, default 0
+        The value for the pixels outside the border (default 0)
+        
+    Returns
+    -------
+    im: 2d array
+        The shifted image
+    
+    Notes
+    -----
+    The output image has the same size as the input. 
+    Therefore the image will be cropped in the process.
     """
     im=np.asarray(im,dtype=np.float32)
     rows,cols = im.shape
@@ -319,52 +492,71 @@ def shift_image(im, shift, borderValue=0):
     
     
     
-def polar_fft(image, anglestep=None, radiimax=None, *, isshiftdft=False,
-              islogr=False, logoutput=False, interpolation='bilinear',
-              truesize=None):
+def polar_fft(im, nangle=None, radiimax=None, *, isshiftdft=False,
+              truesize=None, logpolar=False, logoutput=False, 
+              interpolation='bilinear'):
     """Return dft in polar (or log-polar) units, the angle step 
     (and the log base)
     
-    if the image is already in CCS format, set isccs to True
+    Parameters
+    ----------
+    im: 2d array
+        The image
+    nangle: number, optional
+        The number of angles in the polar representation
+    radiimax: number, optional
+        The number of radius in the polar representation
+    isshiftdft: boolean, default False
+        True if the image is pre processed (DFT + fftshift)
+    truesize: 2 numbers, required if isshiftdft is True
+        The true size of the image
+    logpolar: boolean, default False
+        True if want the log polar representation instead of polar
+    logoutput: boolean, default False
+        True if want the log of the output
+    interpolation: string, default 'bilinear'
+        ('bicubic', 'bilinear', 'nearest') The interpolation 
+        technique. (For now, avoid bicubic)
     
-    anglestep set the angle step.
-    If it is not specified, a value is deduced from the image size
+    Returns
+    -------
+    im: 2d array
+        The (log) polar representation of the input image
+    log_base: number, only if logpolar is True
+        the log base if this is log polar representation
     
-    radiimax is the maximal radius (log of radius if islogr is true).
+    Notes
+    -----
+    radiimax is the maximal radius (log of radius if logpolar is true).
     if not provided, it is deduced from the image size
     
-    To get log-polar, set islogr to True
+    To get log-polar, set logpolar to True
     log_base is the base of the log. It is deduced from radiimax.
     Two images that will be compared should therefore have the same radiimax.
     """
-    image=np.asarray(image, dtype=np.float32)
+    im=np.asarray(im, dtype=np.float32)
     #get dft if not already done
     if not isshiftdft:
-        truesize=image.shape
+        truesize=im.shape
         #substract mean to avoid having large central value
-        image=image-image.mean()
-        image=centered_mag_sq_ccs(dft_optsize(image))
+        im=im-im.mean()
+        im=centered_mag_sq_ccs(dft_optsize(im))
+    #We need truesize! otherwise border effects.
     assert(truesize is not None)
-    #TODO: understand why truesize is so important
-#    elif truesize is None:
-#        print("Warning: True Size not specified")
-#        #This is risky but better than 
-#        truesize=np.asarray(image.shape)
-#        truesize[1]*=2
     
     #the center is shifted from 0,0 to the ~ center 
     #(eg. if 4x4 image, the center is at [2,2], as if 5x5)
-    qshape = np.asarray([image.shape[0]//2,image.shape[1]])
+    qshape = np.asarray([im.shape[0]//2,im.shape[1]])
     center = np.asarray([qshape[0],0]) 
     
     #if the angle Step is not given, take the number of pixel
     #on the perimeter as the target #=range/step
-    nangle=np.min(truesize)
     
-    if anglestep is None:
-        anglestep=np.pi/nangle#range is pi, nbangle = 2r =~pi r
-    else:
-        nangle=int(np.round(np.pi/anglestep))
+    if nangle is None:
+        #TODO: understand why nangle need to be exactly truesize
+        nangle=np.min(truesize)#range is pi, nbangle = 2r =~pi r
+#        nangle-=2
+        
     #get the theta range
     theta=np.linspace(-np.pi/2,np.pi/2,nangle,endpoint=False, dtype=np.float32)
     
@@ -376,7 +568,7 @@ def polar_fft(image, anglestep=None, radiimax=None, *, isshiftdft=False,
     
     #also as the circle is an ellipse in the image, 
     #we want the radius to be from 0 to 1
-    if islogr:
+    if logpolar:
         #The log base solves log_radii_max=log_{log_base}(linear_radii_max)
         #where we decided arbitrarely that linear_radii_max=log_radii_max
         log_base=np.exp(np.log(radiimax) / radiimax)
@@ -397,16 +589,17 @@ def polar_fft(image, anglestep=None, radiimax=None, *, isshiftdft=False,
         interp=cv2.INTER_CUBIC
     if interpolation == 'nearest':
         interp=cv2.INTER_NEAREST
+    
     #get output
-    output=cv2.remap(image,x,y, interp)#LINEAR, CUBIC,LANCZOS4
+    output=cv2.remap(im,x,y, interp)#LINEAR, CUBIC,LANCZOS4
     #apply log
     if logoutput:
         output=cv2.log(output)
     
-    if islogr:
-        return output, anglestep, log_base
+    if logpolar:
+        return output, log_base
     else:
-        return output, anglestep
+        return output
         
         
 ##################    
@@ -417,9 +610,26 @@ def polar_fft(image, anglestep=None, radiimax=None, *, isshiftdft=False,
 def pad_img(im,pad):
     """Pad positively with 0 or negatively (cut)
     
-    Pad is (ytop, ybottom, xleft, xright)
-    or (imin, imax, jmin, jmax)
+    Parameters
+    ----------
+    im: 2d array
+        The image
+    pad: 4 numbers
+        (ytop, ybottom, xleft, xright) or (imin, imax, jmin, jmax)
+        
+    Returns
+    -------
+    im: 2d array
+        The padded (or cropped) image
+    offset: 2 numbers
+        The offset related to the input image
+        
+    Notes
+    -----
+    This changes the size of the image
     """
+    im=np.asarray(im)
+    pad=np.asarray(pad)
     #get shape
     shape=im.shape
     #extract offset from padding 
@@ -447,12 +657,45 @@ def pad_img(im,pad):
     return im, offset
     
     
-def clamp_angle(a):
-    """return a between -pi/2 and pi/2 (in fourrier plane, +pi is the same)"""
-    return (a+np.pi/2)%np.pi - np.pi/2
+def clamp_angle(angle):
+    """return a between -pi/2 and pi/2 (in fourrier plane, +pi is the same)
+    
+    Parameters
+    ----------
+    angle: number
+        The angle to be clamped
+        
+    Returns
+    -------
+    angle: number
+        The clamped angle
+    
+    """
+    return (angle+np.pi/2)%np.pi - np.pi/2
     
     
 def ccs_normalize(compIM,ccsnorm):
+    """ normalize the ccs representation 
+    
+    Parameters
+    ----------
+    compIM: 2d array
+        The CCS image in CCS representation
+    ccsnorm: 2d array
+        The normalization matrix in ccs representation
+    
+    Returns
+    -------
+    compIM: 2d array
+        The normalized CCS image
+    
+    Notes
+    -----
+    (basically an element wise division for CCS)
+    Should probably not be used from outside
+    """
+    compIM=np.asarray(compIM)
+    ccsnorm=np.asarray(ccsnorm)
     ys=ccsnorm.shape[0]
     xs=ccsnorm.shape[1]
     #start with first column
@@ -470,8 +713,27 @@ def gauss_fit(X,Y):
     """
     Fit the function to a gaussian.
     
+    Parameters
+    ----------
+    X: 1d array
+        X values
+    Y: 1d array
+        Y values
+        
+    Returns
+    -------
+    (The return from scipy.optimize.curve_fit)
+    popt : array
+        Optimal values for the parameters
+    pcov : 2d array
+        The estimated covariance of popt.
+    
+    Notes
+    -----
     /!\ This uses a slow curve_fit function! do not use if need speed!
     """
+    X=np.asarray(X)
+    Y=np.asarray(Y)
     #Can not have negative values
     Y[Y<0]=0
     #define gauss function
@@ -489,11 +751,29 @@ def gauss_fit_log(X,Y):
     """
     Fit the log of the input to the log of a gaussian.
     
+    Parameters
+    ----------
+    X: 1d array
+        X values
+    Y: 1d array
+        Y values
+        
+    Returns
+    -------
+    mean: number
+        The mean of the gaussian curve
+    var: number
+        The variance of the gaussian curve
+            
+    Notes
+    -----
     The least square method is used. 
     As this is a log, make sure the amplitude is >> noise
     
     See the gausslog_sympy.py file for explaination
     """
+    X=np.asarray(X)
+    Y=np.asarray(Y)
     #take log data
     Data=np.log(Y)
     #Get Di and Xi
@@ -523,27 +803,61 @@ def gauss_fit_log(X,Y):
     
     
 def center_of_mass(X,Y):
-    """Get center of mass"""
+    """Get center of mass
+    
+    Parameters
+    ----------
+    X: 1d array
+        X values
+    Y: 1d array
+        Y values
+        
+    Returns
+    -------
+    res: number
+        The position of the center of mass in X
+        
+    Notes
+    -----
+    Uses least squares
+    """
+    X=np.asarray(X)
+    Y=np.asarray(Y)
     return (X*Y).sum()/Y.sum()
     
     
-def get_peak_pos(data,wrap=False):
+def get_peak_pos(im,wrap=False):
     """Get the peak position with subpixel precision
     
-    If the data should be wrapped, set wrap to true
+    Parameters
+    ----------
+    im: 2d array
+        The image containing a peak
+    wrap: boolean, defaults False
+        True if the image reoresents a torric world
+        
+    Returns
+    -------
+    [y,x]: 2 numbers
+        The position of the highest peak with subpixel precision
+        
+    Notes
+    -----
+    This is a bit hacky and could be improved
     """ 
-    #remove invalid values (assuming data>0)
-    data[np.logical_not(np.isfinite(data))] = 0
+    im=np.asarray(im)
+    #remove invalid values (assuming im>0)
+    im[np.logical_not(np.isfinite(im))] = 0
     #remove mean
-    data=data-data.mean()
+    im=im-im.mean()
     #get maximum value
-    argmax=data.argmax()
-    dsize=data.size
+    argmax=im.argmax()
+    dsize=im.size
     #get cut value (30% biggest peak)
     #TODO: choose less random value
-    cut = .3*data[argmax]
+    cut = .3*im[argmax]
     #isolate peak
-    peak=data>cut
+    peak=im>cut
     peak,__=label(peak)
     #wrap border
     if wrap and peak[0]!=0 and peak[-1]!=0 and peak[0]!=peak[-1]:
@@ -553,7 +867,7 @@ def get_peak_pos(data,wrap=False):
     
     #get values along X and Y
     X=np.arange(dsize)[peak]
-    Y=data[peak]
+    Y=im[peak]
      #wrap border
     if wrap:
         #wrap X values d
@@ -584,51 +898,76 @@ def get_peak_pos(data,wrap=False):
     """
     import matplotlib.pyplot as plt
     plt.figure()
-    plt.plot(X,Y,'x',label='data')
+    plt.plot(X,Y,'x',label='im')
     plt.plot([ret,ret],[1,Y.max()],label='logfit')
     plt.plot([X.min(),X.max()],[cut,cut])
-    plt.plot([X.min(),X.max()],[data.std(),data.std()])
+    plt.plot([X.min(),X.max()],[im.std(),im.std()])
     #"""
     
     return ret+offset
     
 
 def get_extent(origin, shape):
-    """Computes the extent for imshow() (see matplotlib doc)"""
+    """Computes the extent for imshow() (see matplotlib doc)
+    
+    Parameters
+    ----------
+    origin: 2 numbers
+        The origin of the second image in the first image coordiantes
+    shape: 2 numbers
+        The shape of the image
+        
+    Returns
+    -------
+    extent: 2 numbers
+        The extent
+    """
     return [origin[1],origin[1]+shape[1],origin[0]+shape[0],origin[0]]
       
-def centered_mag_sq_ccs(image):
+def centered_mag_sq_ccs(im):
     """return centered squared magnitude
     
+    Parameters
+    ----------
+    im: 2d array
+        A CCS DFT image
+    Returns
+    -------
+    im: 2d array
+        A centered image of the magnitude of the DFT
+        
+    Notes
+    -----
     Check doc Intel* Image Processing Library
     https://www.comp.nus.edu.sg/~cs4243/doc/ipl.pdf
     
     The center is at position (ys//2, 0)    
     """
+    im=np.asarray(im)
     #multiply image by image* to get squared magnitude
-    image=cv2.mulSpectrums(image,image,flags=0,conjB=True)    
+    im=cv2.mulSpectrums(im,im,flags=0,conjB=True)    
     
-    ys=image.shape[0]
-    xs=image.shape[1]
+    ys=im.shape[0]
+    xs=im.shape[1]
     
     #get correct size return
     ret=np.zeros((ys,xs//2+1))
     
     #first column:
     #center
-    ret[ys//2,0]=image[0,0]
+    ret[ys//2,0]=im[0,0]
     #bottom
-    ret[ys//2+1:,0]=image[1:ys-1:2,0]   
+    ret[ys//2+1:,0]=im[1:ys-1:2,0]   
     #top (Inverted copy bottom)
-    ret[ys//2-1::-1,0]=image[1::2,0] 
+    ret[ys//2-1::-1,0]=im[1::2,0] 
     
     #center columns
-    ret[ys//2:,1:]=image[:(ys-1)//2+1,1::2]
-    ret[:ys//2,1:]=image[(ys-1)//2+1:,1::2]
+    ret[ys//2:,1:]=im[:(ys-1)//2+1,1::2]
+    ret[:ys//2,1:]=im[(ys-1)//2+1:,1::2]
     
     #correct last line if even
     if xs%2 is 0:
-        ret[ys//2+1:,xs//2]=image[1:ys-1:2,xs-1]   
+        ret[ys//2+1:,xs//2]=im[1:ys-1:2,xs-1]   
         ret[:ys//2,xs//2]=0
         
     return ret

@@ -1,4 +1,22 @@
 # -*- coding: utf-8 -*-
+"""
+Another test of image registration
+
+Copyright (C) 2016  Quentin Peter
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+"""
 from matplotlib.pyplot import colorbar, figure, plot, imshow, show,close,semilogy, hold
 import matplotlib.image as mpimg
 import numpy as np
@@ -41,20 +59,6 @@ print(scale*1.6)
 figure(2)
 imshow(t0,alpha=0.5,cmap='Greens')
 imshow(t2,extent=ir.get_extent(origin, t2.shape),alpha=0.5,cmap='Reds')
-
-#%%
-
-lp0, anglestep, log_base=ir.polar_fft(im0, islogr=True)
-lp1, anglestep, log_base=ir.polar_fft(im1, islogr=True,
-                                      anglestep=anglestep,
-                                      radiimax=lp0.shape[1])
-close(3)
-figure(3)
-semilogy(lp0.mean(0))
-semilogy(lp1.mean(0))
-figure(4)
-semilogy(lp1.mean(1))
-semilogy(lp0.mean(1))
 
 #%%
 ra=0.2*np.pi
