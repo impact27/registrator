@@ -427,7 +427,7 @@ def dft_optsize_same(im0,im1):
     f1=dft_optsize(im1,shape=shape)
     return f0,f1
     
-def rotate_scale(im,angle,scale, borderValue=0):
+def rotate_scale(im, angle, scale, borderValue=0):
     """Rotates and scales the image
     
     Parameters
@@ -490,6 +490,42 @@ def shift_image(im, shift, borderValue=0):
                         flags=cv2.INTER_CUBIC,
                         borderValue=borderValue)
     
+def rotate_scale_shift(im, angle, scale, shift, borderValue=0):
+    """Rotates and scales the image
+    
+    Parameters
+    ----------
+    im: 2d array
+        The image
+    angle: number
+        The angle, in radians, to rotate
+    scale: positive number
+        The scale factor
+    shift: 2 numbers
+        (y,x) the shift in y and x direction
+    borderValue: number, default 0
+        The value for the pixels outside the border (default 0)
+    
+    Returns
+    -------
+    im: 2d array
+        the rotated, scaled, and shifted image
+    
+    Notes
+    -----
+    The output image has the same size as the input. 
+    Therefore the image may be cropped in the process.
+    """
+    im=np.asarray(im,dtype=np.float32)
+    rows,cols = im.shape
+    M = cv2.getRotationMatrix2D((cols/2,rows/2),-angle*180/np.pi,1/scale)
+    M[0,2]+=shift[1]
+    M[1,2]+=shift[0]
+    im = cv2.warpAffine(im,M,(cols,rows),
+                        borderMode=cv2.BORDER_CONSTANT,
+                        flags=cv2.INTER_CUBIC,
+                        borderValue=borderValue)#REPLICATE
+    return im
     
     
 def polar_fft(im, nangle=None, radiimax=None, *, isshiftdft=False,
