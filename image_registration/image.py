@@ -295,7 +295,31 @@ def find_shift_cc(im0,im1,ylim=None,xlim=None):
     #Return origin in im0 units
     return idx+offset
     
+def combine_images(imgs, register=True):
+    """Combine similar images into one to reduce the noise
     
+    Parameters
+    ----------
+    imgs: list of 2d array
+        Series of images
+    register: Boolean, default False
+        True if the images should be register before combination
+    
+    Returns
+    -------
+    im: 2d array
+        The result image
+    
+    Notes
+    -----
+    This is an example of the usage of the library    
+    """
+    imgs = np.asarray(imgs,dtype="float")
+    if register:
+        for i in range(1,imgs.shape[0]):
+            ret =register_images(imgs[0,:,:],imgs[i,:,:])
+            imgs[i,:,:]=rotate_scale_shift(imgs[i,:,:],*ret[:3], np.nan)
+    return np.mean(imgs,0)    
     
 ########################   
 #Medium level functions#
