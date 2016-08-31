@@ -850,14 +850,14 @@ def gauss_fit_log(X,Y):
             2*X[1]*X[2]*X[3] + X[2]**3)
     #if denominator is 0, can't do anything
     if abs(den) < 0.00001:
-        print('Warning: zero denominator!',den)
+#        print('Warning: zero denominator!',den)
         return np.nan,np.nan
     #compute mean and variance
     mean=num/den
     var=varnum/den
     #if variance is negative, the data are not a gaussian
     if var<0:
-        print('Warning: negative Variance!',var)
+#        print('Warning: negative Variance!',var)
         return np.nan,np.nan
     return mean,var
     
