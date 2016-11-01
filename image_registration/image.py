@@ -325,7 +325,8 @@ def combine_images(imgs, register=True):
 #Medium level functions#
 ########################
 
-def orientation_angle(im, approxangle=None,* ,isshiftdft=False,truesize=None):
+def orientation_angle(im, approxangle=None,* ,isshiftdft=False,truesize=None,
+                      rotateAngle=None):
     """Give the highest contribution to the orientation
     
     Parameters
@@ -338,6 +339,9 @@ def orientation_angle(im, approxangle=None,* ,isshiftdft=False,truesize=None):
         True if the image has been processed (DFT, fftshift)
     truesize: 2 numbers, optional
         Truesize of the image if isshiftdft is True
+    rotateAngle: number, optional
+        The diagonals are more sensitives than the axis. 
+        rotate the image to avoid pixel orientation (flat or diagonal)
     
     Returns
     -------
@@ -349,6 +353,17 @@ def orientation_angle(im, approxangle=None,* ,isshiftdft=False,truesize=None):
     if approxangle is specified, search only within +- pi/4    
     """
     im=np.asarray(im)
+    
+    #If we rotate the image first
+    if rotateAngle is not None and not isshiftdft:   
+        #compute the scale corresponding to the image
+        scale=np.sqrt(.5*(1+(np.tan(rotateAngle)-1)**2/
+                            (np.tan(rotateAngle)+1)**2))
+        #rotate the image
+        im=rotate_scale(im,rotateAngle,scale)
+    
+    
+    
     #compute log fft (nearest interpolation as line go between pixels)
     lp=polar_fft(im,isshiftdft=isshiftdft,
                             logoutput=False, interpolation='nearest',
@@ -372,13 +387,119 @@ def orientation_angle(im, approxangle=None,* ,isshiftdft=False,truesize=None):
     """
     import matplotlib.pyplot as plt
     plt.figure()
-    plt.plot(lp.sum(-1))
+    plt.plot(anglestep*np.arange(len(adis)),adis)
     #"""
     
     #return max (not -pi/2 as 0 is along y and we want 0 alonx x.)
     #the transformation is basically "For Free"
-    return clamp_angle(ret*anglestep)
+    ret = clamp_angle(ret*anglestep)
+    
+    #Substract rotateAngle to get the original image
+    if rotateAngle is not None:
+        ret=clamp_angle(ret-rotateAngle)
+        
+        
+    return ret
 
+def orientation_angle_2(im, nangle=None,isshiftdft=False,rotateAngle=None):
+    """Give the highest contribution to the orientation
+    
+    Parameters
+    ----------
+    im: 2d array
+        The image
+    nangle: number, optional
+        The number of angles checked for
+    isshiftdft: Boolean, default False
+        True if the image has been processed (DFT, fftshift)
+    rotateAngle: number, optional
+        The diagonals are more sensitives than the axis. 
+        rotate the image to avoid pixel orientation (flat or diagonal)
+    
+    Returns
+    -------
+    angle: number
+        The orientation of the image
+      
+    """
+    im=np.asarray(im, dtype=np.float32)
+    
+    #If we rotate the image first
+    if rotateAngle is not None and not isshiftdft:   
+        #compute the scale corresponding to the image
+        scale=np.sqrt(.5*(1+(np.tan(rotateAngle)-1)**2/
+                            (np.tan(rotateAngle)+1)**2))
+        #rotate the image
+        im=rotate_scale(im,rotateAngle,scale)
+    else:
+        rotateAngle=0
+        
+    #get dft if not already done
+    if not isshiftdft:
+        im=centered_mag_sq_ccs(dft_optsize(im))
+    
+    #the center is shifted from 0,0 to the ~ center 
+    #(eg. if 4x4 image, the center is at [2,2], as if 5x5)
+    qshape = np.asarray([im.shape[0]//2,im.shape[1]])
+    center = np.asarray([qshape[0],0]) 
+    im[qshape[0],0]=0
+    
+    #if the angle Step is not given, take the number of pixel
+    #on the perimeter as the target #=range/step
+    
+    if nangle is None:
+        nangle=np.min(im.shape)#range is pi, nbangle = 2r =~pi r
+        
+    #get the theta range
+    theta=np.linspace(-np.pi/2,np.pi/2,nangle,endpoint=False, dtype=np.float32)
+#    X=np.arange(im.shape[1])-center[1]
+#    Y=-(np.arange(im.shape[0])-center[0])
+#    YG, XG =np.meshgrid(Y,X,indexing='ij')   
+    
+    YG,XG=np.ogrid[-center[0]:im.shape[0]-center[0],
+                       -center[1]:im.shape[1]-center[1]]
+    YG=-YG
+    values=np.empty(theta.shape)
+    
+    #save useful value for computations
+    ylim=center[0]+1
+    
+    
+    
+    #The negative upper limit is the top right corner
+    upper=np.arctan((YG+.5)/(XG+.5))
+    #save lower for later
+    lower=upper.copy()
+    #The positive is top left
+    upper[:ylim,1:]=upper[:ylim,:-1]
+    #for X=0, the top left is meaningless (atan gives only up to pi/2)
+    #should be pi/2 but not important as angle are smaller anyway
+    #Therefore avoid pi/2<pi/2 being false
+    upper[:ylim,0]=np.pi
+    
+    #idem for lower limit: lower right for positives
+    lower[:-1,:]=lower[1:,:]
+    lower[-1,:]=np.arctan((YG[-1,:]-.5)/(XG[-1,:]+.5))
+    #For negative t, the lower left
+    lower[ylim:,1:]=lower[ylim:,:-1]
+    #correct arctan
+    lower[ylim:,0]=-np.pi
+    
+    for i,t in enumerate(theta.flat):
+        cond=np.logical_and(t>lower, 
+                            t<upper)
+        values[i]=np.sum(im[cond])      
+    
+    """
+    figure()
+    imshow(np.log(im[qshape[0]-5:qshape[0]+5,:5]),interpolation='none')
+    figure()
+    plot(theta, values,'x')
+    plot(ir.clamp_angle(0.0555-np.pi/2-rotateAngle)*np.array([1,1]),[np.amin(values),np.amax(values)])
+    #"""
+    
+    return clamp_angle(theta[np.argmax(values)]+np.pi/2+rotateAngle)
+    
 def dft_optsize(im, shape=None):
     """Resize image for optimal DFT and computes it
     
