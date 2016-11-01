@@ -193,7 +193,8 @@ def Scharr_edge(im, blurRadius=10):
     im=cv2.GaussianBlur(im,(blurRadius,blurRadius),0)
     Gx=cv2.Scharr(im,-1,0,1)
     Gy=cv2.Scharr(im,-1,1,0)
-    return cv2.magnitude(Gx,Gy)
+    ret=cv2.magnitude(Gx,Gy)
+    return ret
     
 def edge(im):
     """Extract the edges of an image
