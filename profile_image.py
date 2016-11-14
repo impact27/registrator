@@ -25,7 +25,7 @@ import sys
 sys.path.append('chreg')
 import matplotlib.image as mpimg
 import numpy as np
-import registration.image as ir
+import image_registration.image as ir
 import importlib
 #%% nload images
 fns=['test_DATA/UVData/im0.tif']
