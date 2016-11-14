@@ -171,7 +171,7 @@ def channel_angle(im,chanapproxangle=None, *, isshiftdftedge=False,
                                  approxangle=chanapproxangle,
                                  truesize=truesize)
     
-def Scharr_edge(im, blurRadius=10):
+def Scharr_edge(im, blurRadius=10, imblur=None):
     """Extract the edges using Scharr kernel (Sobel optimized for rotation
     invariance)
     
@@ -181,6 +181,8 @@ def Scharr_edge(im, blurRadius=10):
         The image
     blurRadius: number, default 10
         The gaussian blur raduis (The kernel has size 2*blurRadius+1)
+    imblur: 2d array, OUT
+        If not None, will be fille with blurred image
     
     Returns:
     --------
@@ -194,6 +196,8 @@ def Scharr_edge(im, blurRadius=10):
     Gx=cv2.Scharr(im,-1,0,1)
     Gy=cv2.Scharr(im,-1,1,0)
     ret=cv2.magnitude(Gx,Gy)
+    if imblur is not None and imblur.shape == im.shape:
+        imblur[:,:]=im
     return ret
     
 def edge(im):
