@@ -918,14 +918,14 @@ def gauss_fit(X,Y):
     #Can not have negative values
     Y[Y<0]=0
     #define gauss function
-    def gaus(x,a,x0,sigma):
+    def gauss(x,a,x0,sigma):
         return a*np.exp(-(x-x0)**2/(2*sigma**2))
     #get first estimation for parameter
     mean=(X*Y).sum()/Y.sum()
     sigma=np.sqrt((Y*((X-mean)**2)).sum()/Y.sum())
     height=Y.max()
     #fit with curve_fit
-    return curve_fit(gaus,X,Y,p0=[height,mean,sigma])
+    return curve_fit(gauss,X,Y,p0=[height,mean,sigma])
     
     
 def gauss_fit_log(X,Y):
