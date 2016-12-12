@@ -886,8 +886,10 @@ def ccs_normalize(compIM,ccsnorm):
     #finish whith last row if even
     if xs%2 is 0:
         ccsnorm[2::2,xs-1]=ccsnorm[1:ys-1:2,xs-1]
-        
-    return compIM/ccsnorm
+    res= compIM/ccsnorm  
+    #solve problem with 0/0
+    res[compIM==0]=0
+    return res
       
       
 def gauss_fit(X,Y):
