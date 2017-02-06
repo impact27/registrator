@@ -491,11 +491,12 @@ def orientation_angle_2(im, nangle=None,isshiftdft=False,rotateAngle=None):
         values[i]=np.sum(im[cond])      
     
     """
-    figure()
-    imshow(np.log(im[qshape[0]-5:qshape[0]+5,:5]),interpolation='none')
-    figure()
-    plot(theta, values,'x')
-    plot(ir.clamp_angle(0.0555-np.pi/2-rotateAngle)*np.array([1,1]),[np.amin(values),np.amax(values)])
+    import matplotlib.pyplot as plt
+#    plt.figure()
+#    plt.imshow(np.log(im[qshape[0]-5:qshape[0]+5,:5]),interpolation='none')
+    plt.figure()
+    plt.plot(theta, values,'x')
+#    plt.plot(ir.clamp_angle(0.0555-np.pi/2-rotateAngle)*np.array([1,1]),[np.amin(values),np.amax(values)])
     #"""
     
     return clamp_angle(theta[np.argmax(values)]+np.pi/2+rotateAngle)
@@ -572,7 +573,7 @@ def dft_optsize_same(im0,im1):
     f1=dft_optsize(im1,shape=shape)
     return f0,f1
     
-def rotate_scale(im, angle, scale, borderValue=0):
+def rotate_scale(im, angle, scale, borderValue=0, interp=cv2.INTER_CUBIC):
     """Rotates and scales the image
     
     Parameters
@@ -601,7 +602,7 @@ def rotate_scale(im, angle, scale, borderValue=0):
     M = cv2.getRotationMatrix2D((cols/2,rows/2),-angle*180/np.pi,1/scale)
     im = cv2.warpAffine(im,M,(cols,rows),
                         borderMode=cv2.BORDER_CONSTANT,
-                        flags=cv2.INTER_CUBIC,
+                        flags=interp,
                         borderValue=borderValue)#REPLICATE
     return im
     
