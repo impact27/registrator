@@ -212,7 +212,14 @@ def find_shift_dft(im0,im1, isccs=False, subpix=True):
     from matplotlib import pyplot as plt
     from numpy.fft import fftshift
     plt.figure()
-    plt.imshow(fftshift(xc))
+    plt.imshow(np.log(np.abs(fftshift(im0))))
+    plt.figure()
+    plt.imshow(np.log(np.abs(fftshift(im1))))
+    plt.figure()
+    plt.imshow(fftshift(ccs_normalize(mulSpec,normccs)))
+    plt.figure()
+    extent= (-np.shape(xc)[1]/2, np.shape(xc)[1]/2, -np.shape(xc)[0]/2, np.shape(xc)[0]/2  )
+    plt.imshow(np.log(np.abs(fftshift(xc))),extent = extent)
     
     #"""
     #plt.imshow(fftshift(xc))
@@ -1155,3 +1162,19 @@ def centered_mag_sq_ccs(im):
         ret[:ys//2,xs//2]=0
         
     return ret
+
+def is_overexposed(im):
+    """Simple test to check if image is overexposed
+    
+    Parameters
+    ----------
+    im: 2d array integer
+        the image
+    Returns
+    -------
+    overexposed: Bool
+        Is the image overexposed  
+    """
+    diffbincount=np.diff(np.bincount(np.ravel(im)))
+    overexposed=diffbincount[-1]>np.std(diffbincount)
+    return overexposed
