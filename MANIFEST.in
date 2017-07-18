@@ -1,0 +1,2 @@
+include README.md
+include image_registration/tests/test_data/*
