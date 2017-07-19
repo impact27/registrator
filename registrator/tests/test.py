@@ -1,7 +1,7 @@
 from unittest import TestCase
 
-import image_registration.image as ir
-import image_registration.channel as cr
+import registrator.image as ir
+import registrator.channel as cr
 from tifffile import imread
 import numpy as np
 from . import __file__ 

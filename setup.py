@@ -20,7 +20,7 @@ def readme():
     with open('README.md') as f:
         return f.read()
 
-setup(name='image_registration',
+setup(name='registrator',
       version='0.1.0',
       description='Register images of microfluidics channels',
       long_description=readme(),
@@ -31,11 +31,11 @@ setup(name='image_registration',
         'Topic :: Scientific/Engineering',
       ],
       keywords='image registration microfluidics',
-      url='https://github.com/impact27/image_registration',
+      url='https://github.com/impact27/registrator',
       author='Quentin Peter',
       author_email='qaep2@cam.ac.uk',
       license='GPl v3',
-      packages=['image_registration'],
+      packages=['registrator'],
       install_requires=[
           'numpy',
           'scipy',
