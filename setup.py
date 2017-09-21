@@ -16,19 +16,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 from setuptools import setup
 
+
 def readme():
     with open('README.md') as f:
         return f.read()
+
 
 setup(name='registrator',
       version='0.1.0',
       description='Register images of microfluidics channels',
       long_description=readme(),
       classifiers=[
-        'Development Status :: 4 - Beta',
-        'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)',
-        'Programming Language :: Python :: 3 :: Only',
-        'Topic :: Scientific/Engineering',
+          'Development Status :: 4 - Beta',
+          'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)',
+          'Programming Language :: Python :: 3 :: Only',
+          'Topic :: Scientific/Engineering',
       ],
       keywords='image registration microfluidics',
       url='https://github.com/impact27/registrator',
@@ -45,7 +47,3 @@ setup(name='registrator',
       tests_require=['nose', 'nose-cover3'],
       include_package_data=True,
       zip_safe=False)
-
-
-
- 
