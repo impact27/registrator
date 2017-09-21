@@ -893,10 +893,11 @@ def ccs_normalize(compIM,ccsnorm):
     ccsnorm[:,2::2]=ccsnorm[:,1:xs-1:2]
     #finish whith last row if even
     if xs%2 is 0:
-        ccsnorm[2::2,xs-1]=ccsnorm[1:ys-1:2,xs-1]
-    res= compIM/ccsnorm  
+        ccsnorm[2::2,xs-1] = ccsnorm[1:ys-1:2,xs-1]
     #solve problem with 0/0
-    res[ccsnorm==0]=0
+    ccsnorm[ccsnorm==0] = np.nextafter(0., 1.)
+    
+    res= compIM/ccsnorm  
     return res
       
       
@@ -1163,7 +1164,7 @@ def centered_mag_sq_ccs(im):
         
     return ret
 
-def is_overexposed(im):
+def is_overexposed(ims):
     """Simple test to check if image is overexposed
     
     Parameters
@@ -1175,6 +1176,10 @@ def is_overexposed(im):
     overexposed: Bool
         Is the image overexposed  
     """
-    diffbincount=np.diff(np.bincount(np.ravel(im)))
+    if len(np.shape(ims)) == 3:
+        return [is_overexposed(im) for im in ims]
+    
+    ims = np.array(ims, int)
+    diffbincount=np.diff(np.bincount(np.ravel(ims)))
     overexposed=diffbincount[-1]>np.std(diffbincount)
     return overexposed
