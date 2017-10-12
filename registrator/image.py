@@ -902,7 +902,7 @@ def ccs_normalize(compIM, ccsnorm):
     if xs % 2 is 0:
         ccsnorm[2::2, xs - 1] = ccsnorm[1:ys - 1:2, xs - 1]
     # solve problem with 0/0
-    ccsnorm[ccsnorm == 0] = np.nextafter(0., 1.)
+    ccsnorm[ccsnorm == 0] = np.nextafter(0., 1., dtype = ccsnorm.dtype)
 
     res = compIM / ccsnorm
     return res
