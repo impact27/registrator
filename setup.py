@@ -23,7 +23,7 @@ def readme():
 
 
 setup(name='registrator',
-      version='0.1.0',
+      version='0.1.1',
       description='Register images of microfluidics channels',
       long_description=readme(),
       classifiers=[
