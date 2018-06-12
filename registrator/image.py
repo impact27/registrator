@@ -49,6 +49,7 @@ import numpy as np
 import cv2
 from scipy.optimize import curve_fit  # /!\ SLOW! avoid
 from scipy.ndimage.measurements import label
+import warnings
 
 
 ######################
@@ -56,7 +57,7 @@ from scipy.ndimage.measurements import label
 ######################
 
 
-def register_images(im0, im1, *, rmMean=True):
+def register_images(im0, im1, *, rmMean=True, correctScale=True):
     """Finds the rotation, scaling and translation of im1 relative to im0
 
     Parameters
@@ -90,6 +91,11 @@ def register_images(im0, im1, *, rmMean=True):
     f0, f1 = dft_optsize_same(im0, im1)
     # Get rotation and scale
     angle, scale = find_rotation_scale(f0, f1, isccs=True)
+    # Avoid fluctiuations
+    if not correctScale:
+        if np.abs(1 - scale) > 0.05:
+            warnings.warn("Scale should be corrected")
+        scale = 1
     # apply rotation and scale
     im2 = rotate_scale(im1, angle, scale)
     f2 = dft_optsize(im2, shape=f0.shape)
