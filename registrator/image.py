@@ -250,7 +250,7 @@ def find_shift_dft(im0, im1, isccs=False, subpix=True):
     return idx
 
 
-def find_shift_cc(im0, im1, ylim=None, xlim=None):
+def find_shift_cc(im0, im1, ylim=None, xlim=None, subpix=True):
     """Finds the best shift between im0 and im1 using cross correlation
 
     Parameters
@@ -281,8 +281,8 @@ def find_shift_cc(im0, im1, ylim=None, xlim=None):
     im0 = np.asarray(im0, dtype=np.float32)
     im1 = np.asarray(im1, dtype=np.float32)
     # Remove mean
-    im0 = im0 - im0.mean()
-    im1 = im1 - im1.mean()
+    im0 = im0 - np.nanmean(im0)
+    im1 = im1 - np.nanmean(im1)
     # Save shapes as np array
     shape0 = np.asarray(im0.shape)
     shape1 = np.asarray(im1.shape)
@@ -306,6 +306,14 @@ def find_shift_cc(im0, im1, ylim=None, xlim=None):
     # Find maximum of abs (can be anticorrelated)
     idx = np.asarray(np.unravel_index(np.argmax(xc), xc.shape))
     # Return origin in im0 units
+    if subpix:
+        # update idx
+        idx = np.asarray([get_peak_pos(xc[:, idx[1]], wrap=False),
+                          get_peak_pos(xc[idx[0], :], wrap=False)])
+    else:
+        # restrics to reasonable values
+        idx[idx > shape // 2] -= shape[idx > shape // 2]
+        
     return idx + offset
 
 
